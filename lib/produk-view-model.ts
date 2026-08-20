@@ -27,7 +27,7 @@ export type ProdukRow = Record<string, unknown> & {
 
 export function splitComma(value: unknown): string[] {
   if (Array.isArray(value)) return value.map(String).map((item) => item.trim()).filter(Boolean)
-  return String(value ?? "").split(",").map((item) => item.trim()).filter(Boolean)
+  return String(value ?? "").split(/[,+]/).map((item) => item.trim()).filter(Boolean)
 }
 
 export function firstNonEmpty(...values: unknown[]): string {

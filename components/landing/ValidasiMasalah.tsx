@@ -10,10 +10,10 @@ export function ValidasiMasalah({ poinKeluhan }: ValidasiMasalahProps) {
       <div className="mx-auto max-w-2xl text-center">
         <p className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-primary">Cerita yang familiar</p>
         <h2 id="validasi-masalah-title" className="text-balance text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-          banyak yang merasakan 🤍
+          memang banyak yang merasakan juga kondisi ini
         </h2>
         <p className="mt-4 text-pretty leading-7 text-muted-foreground">
-          Wajar kalau kamu pernah merasakan hal-hal ini. Banyak orang memulainya dari keluhan yang sama.
+          tenang saja! Jika kamu pernah merasakan hal-hal ini. Banyak orang punya keluhan yang sama.
         </p>
       </div>
 

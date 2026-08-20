@@ -39,11 +39,11 @@ export default async function ProdukDetailPage({ params }: { params: Promise<{ s
       <DetailKandungan sections={details.detailSections} />
       <CaraPakai steps={details.aturanPakai} />
       {details.kontraindikasi.length > 0 && (
-        <section className="bg-amber-50 px-4 py-14 sm:px-6 lg:px-8" aria-labelledby="kontraindikasi-title">
+        <section className="bg-background px-4 py-14 sm:px-6 lg:px-8" aria-labelledby="kontraindikasi-title">
           <div className="mx-auto max-w-3xl rounded-2xl border border-amber-200 bg-card p-6 shadow-sm sm:p-8">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-amber-800">Kejujuran dulu</p>
-            <h2 id="kontraindikasi-title" className="mt-2 text-2xl font-semibold text-foreground">Supaya adil dari awal, konsultasi dulu jika:</h2>
-            <ul className="mt-5 grid gap-3 sm:grid-cols-2">{details.kontraindikasi.map((item) => <li key={item} className="rounded-xl border border-amber-200 bg-background p-4 text-sm leading-6">{item}</li>)}</ul>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">Kontraindikasi</p>
+            <h2 id="kontraindikasi-title" className="mt-2 text-2xl font-semibold text-foreground">konsultasikan dahulu jika ada kondisi</h2>
+            <ul className="mt-5 grid gap-3 sm:grid-cols-2">{details.kontraindikasi.map((item) => <li key={item} className="rounded-xl border border-border bg-card p-4 text-sm leading-6">{item}</li>)}</ul>
           </div>
         </section>
       )}
