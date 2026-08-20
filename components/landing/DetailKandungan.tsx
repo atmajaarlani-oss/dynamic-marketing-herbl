@@ -11,20 +11,24 @@ export function DetailKandungan({ sections = defaultSections }: { sections?: Det
     <section id="transparansi" className="bg-background px-4 py-16 sm:px-6 lg:px-8" aria-labelledby="detail-kandungan-title">
       <div className="mx-auto max-w-3xl">
         <p className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-primary">Transparan sejak awal</p>
-        <h2 id="detail-kandungan-title" className="text-balance text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">Untuk mengetahui lebih detail</h2>
+        <h2 id="detail-kandungan-title" className="text-balance text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">Ringkasan kandungan produk</h2>
         <div className="mt-8 grid gap-4">
           {sections.map((section) => (
-            <div key={section.title} className="rounded-2xl border border-border bg-card px-5 shadow-sm">
-              <h3 className="border-b border-border py-4 text-sm font-bold uppercase tracking-[0.14em] text-primary">{section.title}</h3>
-              <div className="divide-y divide-border">
-                {section.items.map((item) => (
-                  <details key={`${section.title}-${item.title}`} className="group py-5">
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold text-foreground marker:hidden">{item.title}<span className="text-xl font-normal text-primary transition-transform group-open:rotate-45" aria-hidden="true">+</span></summary>
-                    {item.content && <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">{item.content}</p>}
-                  </details>
-                ))}
+            <details key={section.title} className="group rounded-2xl border border-border bg-card px-5 shadow-sm">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-5 font-semibold text-foreground marker:hidden">
+                <span className="text-sm font-bold uppercase tracking-[0.14em] text-primary">{section.title}</span>
+                <span className="text-xl font-normal text-primary transition-transform group-open:rotate-45" aria-hidden="true">+</span>
+              </summary>
+              <div className="border-t border-border pb-5 pt-2">
+                <ul className="flex flex-wrap gap-2" aria-label={section.title}>
+                  {section.items.map((item) => (
+                    <li key={`${section.title}-${item.title}`} className="rounded-full bg-secondary px-3 py-1.5 text-sm text-secondary-foreground">
+                      {item.title}
+                    </li>
+                  ))}
+                </ul>
               </div>
-            </div>
+            </details>
           ))}
         </div>
       </div>
