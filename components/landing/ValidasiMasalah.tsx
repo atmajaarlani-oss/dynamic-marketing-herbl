@@ -8,7 +8,7 @@ export function ValidasiMasalah({ poinKeluhan }: ValidasiMasalahProps) {
   return (
     <section aria-labelledby="validasi-masalah-title" className="mx-auto w-full max-w-6xl px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
       <div className="mx-auto max-w-2xl text-center">
-        <p className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-primary">Familiar</p>
+        <p className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-primary">Familiar ?</p>
         <h2 id="validasi-masalah-title" className="text-balance text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
           beberapa masalah yang sering dirasakan
         </h2>
