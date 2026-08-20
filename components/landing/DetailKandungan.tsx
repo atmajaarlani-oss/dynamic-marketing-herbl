@@ -20,7 +20,7 @@ export function DetailKandungan({ sections = defaultSections }: { sections?: Det
                 {section.items.map((item) => (
                   <details key={`${section.title}-${item.title}`} className="group py-5">
                     <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold text-foreground marker:hidden">{item.title}<span className="text-xl font-normal text-primary transition-transform group-open:rotate-45" aria-hidden="true">+</span></summary>
-                    <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">{item.content}</p>
+                    {item.content && <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">{item.content}</p>}
                   </details>
                 ))}
               </div>

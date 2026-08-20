@@ -65,20 +65,20 @@ export function getProductDetails(product: ProdukRow) {
     targetKerja,
     detailSections: [
       {
-        title: "Kandungan aktif",
-        items: kandungan.map((item) => ({ title: item, content: "Kandungan aktif yang tercantum pada formula produk." })),
+        title: "Target kerja",
+        items: targetKerja.map((item) => ({ title: item, content: "" })),
       },
       {
         title: "Komposisi",
-        items: komposisi.map((item) => ({ title: item, content: "Komposisi produk yang diinformasikan secara transparan." })),
+        items: komposisi.map((item) => ({ title: item, content: "" })),
+      },
+      {
+        title: "Kandungan aktif",
+        items: kandungan.map((item) => ({ title: item, content: "" })),
       },
       {
         title: "Mekanisme kerja",
-        items: mekanisme.map((item) => ({ title: item, content: "Penjelasan mekanisme kerja berdasarkan data produk." })),
-      },
-      {
-        title: "Target kerja",
-        items: targetKerja.map((item) => ({ title: item, content: "Area dukungan formula yang dijelaskan dalam data produk." })),
+        items: mekanisme.map((item) => ({ title: item, content: "" })),
       },
     ].filter((section) => section.items.length > 0),
     edukasi: firstNonEmpty(product.informasi, product.fungsi_utama, "Produk ini dirancang untuk menemani ikhtiar harian secara bertahap."),
