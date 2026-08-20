@@ -8,7 +8,7 @@ const defaultSections: DetailSection[] = [
 
 export function DetailKandungan({ sections = defaultSections }: { sections?: DetailSection[] }) {
   return (
-    <section className="bg-background px-4 py-16 sm:px-6 lg:px-8" aria-labelledby="detail-kandungan-title">
+    <section id="transparansi" className="bg-background px-4 py-16 sm:px-6 lg:px-8" aria-labelledby="detail-kandungan-title">
       <div className="mx-auto max-w-3xl">
         <p className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-primary">Transparan sejak awal</p>
         <h2 id="detail-kandungan-title" className="text-balance text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">Untuk mengetahui lebih detail</h2>

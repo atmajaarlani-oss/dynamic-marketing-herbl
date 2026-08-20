@@ -33,7 +33,7 @@ export default async function ProdukDetailPage({ params }: { params: Promise<{ s
     <main className="min-h-screen bg-background text-foreground">
       <Hero painHeadline={painHeadline} hopeStatement={hopeStatement} namaProduk={product.nama_produk ?? slug} gambar={getProductImage(product.gambar)} hargaUtama={Number(product.harga_utama ?? 0)} hargaDiskon={Number(product.harga_diskon ?? 0)} hargaPerHari={details.hargaPerHari} persenHemat={hitungPersenHemat(Number(product.harga_utama ?? 0), Number(product.harga_diskon ?? 0))} nomorBpom={product.bpom ?? product.nomor_bpom} halalTersertifikasi={PENGATURAN_GLOBAL.halalTersertifikasi} />
       <ValidasiMasalah poinKeluhan={details.indikasi} />
-      <EdukasiRingan penjelasan={details.edukasi} poin={details.edukasiPoin} />
+      <EdukasiRingan penjelasan={details.edukasi} namaProduk={product.nama_produk ?? slug} poin={details.edukasiPoin} />
       <SocialProof />
       <PerbandinganNilai />
       <DetailKandungan sections={details.detailSections} />

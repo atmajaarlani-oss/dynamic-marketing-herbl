@@ -1,8 +1,9 @@
 'use client'
 
 import Image from 'next/image'
-import { ArrowRight, MessageCircle } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import BadgeBpom from './BadgeBpom'
+import Link from 'next/link'
 
 type HeroProps = {
   painHeadline: string
@@ -76,14 +77,13 @@ export function Hero({
               Beli Sekarang
               <ArrowRight className="size-4" aria-hidden="true" />
             </button>
-            <button
-              type="button"
-              onClick={onChatClick}
+            <Link
+              href="#transparansi"
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-[#78936f] bg-transparent px-6 py-3 text-sm font-semibold text-[#35513a] transition hover:bg-[#e5eddc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#78936f] focus-visible:ring-offset-2"
             >
-              <MessageCircle className="size-5" aria-hidden="true" />
-              Chat Saya
-            </button>
+              Kenali cara kerjanya
+              <ArrowRight className="size-4" aria-hidden="true" />
+            </Link>
           </div>
         </div>
 
