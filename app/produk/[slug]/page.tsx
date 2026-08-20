@@ -36,7 +36,7 @@ export default async function ProdukDetailPage({ params }: { params: Promise<{ s
       <EdukasiRingan penjelasan={details.edukasi} poin={details.edukasiPoin} />
       <SocialProof />
       <PerbandinganNilai />
-      <DetailKandungan items={details.detailKandungan} />
+      <DetailKandungan sections={details.detailSections} />
       <CaraPakai steps={details.aturanPakai} />
       {details.kontraindikasi.length > 0 && (
         <section className="bg-amber-50 px-4 py-14 sm:px-6 lg:px-8" aria-labelledby="kontraindikasi-title">

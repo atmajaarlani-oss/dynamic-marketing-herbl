@@ -63,12 +63,24 @@ export function getProductDetails(product: ProdukRow) {
     komposisi,
     mekanisme,
     targetKerja,
-    detailKandungan: [
-      ...kandungan.map((item) => ({ title: item, content: "Kandungan aktif yang tercantum pada formula produk." })),
-      ...komposisi.map((item) => ({ title: `Komposisi: ${item}`, content: "Bagian dari komposisi produk yang diinformasikan secara transparan." })),
-      ...targetKerja.map((item) => ({ title: `Target kerja: ${item}`, content: "Area dukungan formula yang dijelaskan dalam data produk." })),
-      ...mekanisme.map((item) => ({ title: "Mekanisme kerja", content: item })),
-    ],
+    detailSections: [
+      {
+        title: "Kandungan aktif",
+        items: kandungan.map((item) => ({ title: item, content: "Kandungan aktif yang tercantum pada formula produk." })),
+      },
+      {
+        title: "Komposisi",
+        items: komposisi.map((item) => ({ title: item, content: "Komposisi produk yang diinformasikan secara transparan." })),
+      },
+      {
+        title: "Mekanisme kerja",
+        items: mekanisme.map((item) => ({ title: item, content: "Penjelasan mekanisme kerja berdasarkan data produk." })),
+      },
+      {
+        title: "Target kerja",
+        items: targetKerja.map((item) => ({ title: item, content: "Area dukungan formula yang dijelaskan dalam data produk." })),
+      },
+    ].filter((section) => section.items.length > 0),
     edukasi: firstNonEmpty(product.informasi, product.fungsi_utama, "Produk ini dirancang untuk menemani ikhtiar harian secara bertahap."),
     edukasiPoin: mekanisme.length ? mekanisme : indikasi.slice(0, 3),
     aturanPakai: splitComma(firstNonEmpty(product.aturan_pakai, product.anjuran)),
