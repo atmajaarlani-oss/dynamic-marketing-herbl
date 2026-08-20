@@ -11,6 +11,7 @@ type HeroProps = {
   hargaUtama?: number
   hargaDiskon?: number
   hargaPerHari?: number | null
+  persenHemat?: number
   nomorBpom?: string | null
   halalTersertifikasi?: boolean
   onBuyClick?: () => void
@@ -24,6 +25,7 @@ export function Hero({
   hargaUtama,
   hargaDiskon,
   hargaPerHari,
+  persenHemat,
   nomorBpom,
   halalTersertifikasi,
   onBuyClick,
@@ -51,6 +53,11 @@ export function Hero({
               {hargaUtama !== undefined && hargaUtama > hargaDiskon && (
                 <span className="text-sm text-[#526052] line-through">
                   {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(hargaUtama)}
+                </span>
+              )}
+              {!!persenHemat && persenHemat > 0 && (
+                <span className="rounded-full bg-[#dce6d0] px-2.5 py-1 text-xs font-semibold text-[#35513a]">
+                  Hemat {persenHemat}%
                 </span>
               )}
               {hargaPerHari !== null && hargaPerHari !== undefined && (

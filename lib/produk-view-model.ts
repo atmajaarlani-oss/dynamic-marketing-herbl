@@ -34,10 +34,8 @@ export function firstNonEmpty(...values: unknown[]): string {
   return values.map((value) => String(value ?? "").trim()).find(Boolean) ?? ""
 }
 
-export function hitungHargaPerHari(harga: number, isi?: number | null, dosis?: number | null) {
-  const hari = (isi ?? 0) / (dosis ?? 0)
-  return hari > 0 ? harga / hari : null
-}
+import { hitungHargaPerHari } from "@/lib/harga"
+
 
 export function getProductImage(value: unknown): string {
   return splitComma(value)[0] ?? "/placeholder.svg"
