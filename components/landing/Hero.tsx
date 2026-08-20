@@ -2,6 +2,7 @@
 
 import Image from 'next/image'
 import { ArrowRight, MessageCircle } from 'lucide-react'
+import BadgeBpom from './BadgeBpom'
 
 type HeroProps = {
   painHeadline: string
@@ -10,6 +11,8 @@ type HeroProps = {
   hargaUtama?: number
   hargaDiskon?: number
   hargaPerHari?: number | null
+  nomorBpom?: string | null
+  halalTersertifikasi?: boolean
   onBuyClick?: () => void
   onChatClick?: () => void
 }
@@ -21,6 +24,8 @@ export function Hero({
   hargaUtama,
   hargaDiskon,
   hargaPerHari,
+  nomorBpom,
+  halalTersertifikasi,
   onBuyClick,
   onChatClick,
 }: HeroProps) {
@@ -37,6 +42,7 @@ export function Hero({
           <p className="mt-5 max-w-xl text-pretty text-base leading-7 text-[#526052] sm:text-lg">
             {hopeStatement}
           </p>
+          <BadgeBpom nomorBpom={nomorBpom} halalTersertifikasi={halalTersertifikasi} />
           {hargaDiskon !== undefined && (
             <div className="mt-5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <span className="text-2xl font-bold text-[#35513a]">

@@ -2,6 +2,8 @@ export const PENGATURAN_GLOBAL = {
   keunggulanPtInsani:
     "Herbal Insani menghadirkan produk herbal berkualitas tinggi yang diformulasikan berdasarkan khasiat tradisional Indonesia, didukung literatur fitokimia modern, dan diproduksi dengan standar higiene yang ketat.",
   tagline: "Solusi Herbal Alami untuk Kesehatan Optimal",
+  // Aktifkan hanya setelah status sertifikasi halal resmi sudah diverifikasi.
+  halalTersertifikasi: false,
   deskripsiSingkat:
     "PT Herbal Insani menyediakan rangkaian produk herbal campuran yang difokuskan pada metabolisme, imun, pencernaan, kesehatan wanita, saluran kemih, dan regenerasi saraf.",
   alamat: "https://maps.app.goo.gl/rWGuoaArtmNwLQK36",

@@ -21,6 +21,8 @@ export type ProdukRow = Record<string, unknown> & {
   berat_gram?: number | null
   headline_pain?: string | null
   sub_headline_harapan?: string | null
+  bpom?: string | null
+  nomor_bpom?: string | null
 }
 
 export function splitComma(value: unknown): string[] {
