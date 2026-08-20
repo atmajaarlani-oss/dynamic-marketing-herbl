@@ -2,6 +2,7 @@ export const runtime = "edge"
 
 import { notFound } from "next/navigation"
 import { createClient } from "@/lib/supabase"
+import Hero from "@/components/landing/Hero"
 import { CaraPakai } from "@/components/landing/CaraPakai"
 import { DetailKandungan } from "@/components/landing/DetailKandungan"
 import { KeunggulanInsani } from "@/components/landing/KeunggulanInsani"
@@ -14,6 +15,15 @@ function splitText(value: string | null | undefined) {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean)
+}
+
+function hitungHargaPerHari(
+  hargaDiskon: number,
+  jumlahSatuan: number | null | undefined,
+  dosisHarianSatuan: number | null | undefined,
+) {
+  const totalHari = (jumlahSatuan ?? 0) / (dosisHarianSatuan ?? 0)
+  return totalHari > 0 ? hargaDiskon / totalHari : null
 }
 
 export default async function ProdukDetailPage({
@@ -35,9 +45,24 @@ export default async function ProdukDetailPage({
   const indikasi = splitText(produk.indikasi)
   const kontraindikasi = splitText(produk.kontraindikasi)
   const kandungan = splitText(produk.kandungan)
+  const painHeadline = produk.headline_pain || indikasi[0] || produk.nama_produk
+  const hopeStatement = produk.sub_headline_harapan || produk.fungsi_utama || produk.deskripsi || "Dukungan herbal untuk menemani ikhtiar harian Anda."
+  const hargaPerHari = hitungHargaPerHari(
+    produk.harga_diskon,
+    produk.jumlah_satuan,
+    produk.dosis_harian_satuan,
+  )
 
   return (
     <main className="min-h-screen bg-background text-foreground">
+      <Hero
+        painHeadline={painHeadline}
+        hopeStatement={hopeStatement}
+        gambar={produk.gambar || "/placeholder.svg"}
+        hargaUtama={produk.harga_utama}
+        hargaDiskon={produk.harga_diskon}
+        hargaPerHari={hargaPerHari}
+      />
       <section className="mx-auto grid max-w-6xl gap-8 px-5 py-12 sm:px-8 lg:grid-cols-2 lg:items-center lg:py-20">
         <div className="relative flex min-h-80 items-center justify-center overflow-hidden rounded-2xl bg-muted p-8 shadow-sm">
           {produk.gambar ? (

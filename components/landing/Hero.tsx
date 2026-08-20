@@ -7,6 +7,9 @@ type HeroProps = {
   painHeadline: string
   hopeStatement: string
   gambar: string
+  hargaUtama?: number
+  hargaDiskon?: number
+  hargaPerHari?: number | null
   onBuyClick?: () => void
   onChatClick?: () => void
 }
@@ -15,6 +18,9 @@ export function Hero({
   painHeadline,
   hopeStatement,
   gambar,
+  hargaUtama,
+  hargaDiskon,
+  hargaPerHari,
   onBuyClick,
   onChatClick,
 }: HeroProps) {
@@ -31,6 +37,21 @@ export function Hero({
           <p className="mt-5 max-w-xl text-pretty text-base leading-7 text-[#526052] sm:text-lg">
             {hopeStatement}
           </p>
+          {hargaDiskon !== undefined && (
+            <div className="mt-5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span className="text-2xl font-bold text-[#35513a]">
+                {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(hargaDiskon)}
+              </span>
+              {hargaUtama !== undefined && hargaUtama > hargaDiskon && (
+                <span className="text-sm text-[#526052] line-through">
+                  {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(hargaUtama)}
+                </span>
+              )}
+              {hargaPerHari !== null && hargaPerHari !== undefined && (
+                <span className="w-full text-xs text-[#526052]">Sekitar {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(hargaPerHari)} per hari</span>
+              )}
+            </div>
+          )}
           <div className="mt-8 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
             <button
               type="button"
