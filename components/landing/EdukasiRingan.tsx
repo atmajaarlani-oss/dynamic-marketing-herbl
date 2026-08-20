@@ -6,7 +6,7 @@ type EdukasiRinganProps = {
 
 export function EdukasiRingan({ penjelasan, namaProduk, poin = [] }: EdukasiRinganProps) {
   return (
-    <section aria-labelledby="edukasi-ringan-title" className="mx-auto w-full max-w-6xl px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
+    <section id="edukasi" aria-labelledby="edukasi-ringan-title" className="mx-auto w-full max-w-6xl scroll-mt-6 px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
       <div className="rounded-2xl bg-secondary/60 p-6 shadow-sm sm:p-8 lg:p-10">
         <div className="max-w-2xl">
           <p className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-primary">Kenali {namaProduk}</p>
