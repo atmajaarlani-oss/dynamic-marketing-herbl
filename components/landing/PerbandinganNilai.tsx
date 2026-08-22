@@ -55,9 +55,9 @@ export function PerbandinganNilai() {
 
         <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
           <div className="grid grid-cols-[1.35fr_1fr_1fr] border-b border-border bg-muted/50 px-4 py-4 text-sm font-semibold sm:px-6">
-            <div className="text-muted-foreground">Kebutuhan pembeli</div>
-            <div className="text-center text-foreground">Pendekatan kimia</div>
-            <div className="text-center text-primary">Pendekatan herbal</div>
+            <div className="text-muted-foreground">Kebutuhanmu</div>
+            <div className="text-center text-foreground">Kimia</div>
+            <div className="text-center text-primary">Herbal</div>
           </div>
 
           <div className="divide-y divide-border">

@@ -1,12 +1,21 @@
 'use client'
 
 import Image from 'next/image'
-import { ArrowRight, MessageCircle } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
+import BadgeBpom from './BadgeBpom'
+import Link from 'next/link'
 
 type HeroProps = {
   painHeadline: string
   hopeStatement: string
+  namaProduk: string
   gambar: string
+  hargaUtama?: number
+  hargaDiskon?: number
+  hargaPerHari?: number | null
+  persenHemat?: number
+  nomorBpom?: string | null
+  halalTersertifikasi?: boolean
   onBuyClick?: () => void
   onChatClick?: () => void
 }
@@ -14,7 +23,14 @@ type HeroProps = {
 export function Hero({
   painHeadline,
   hopeStatement,
+  namaProduk,
   gambar,
+  hargaUtama,
+  hargaDiskon,
+  hargaPerHari,
+  persenHemat,
+  nomorBpom,
+  halalTersertifikasi,
   onBuyClick,
   onChatClick,
 }: HeroProps) {
@@ -23,7 +39,7 @@ export function Hero({
       <div className="mx-auto grid max-w-6xl items-center gap-8 overflow-hidden rounded-2xl bg-[#f3eee4] p-6 shadow-[0_16px_40px_rgba(63,73,48,0.12)] sm:p-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-12 lg:p-14">
         <div className="order-2 flex flex-col items-start lg:order-1">
           <span className="mb-4 inline-flex rounded-full bg-[#dce6d0] px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#35513a]">
-            Herbal Insani
+            Herbal + {namaProduk}
           </span>
           <h1 id="hero-heading" className="max-w-2xl text-pretty text-4xl font-bold leading-[1.08] tracking-tight text-[#26352a] sm:text-5xl lg:text-6xl">
             {painHeadline}
@@ -31,6 +47,27 @@ export function Hero({
           <p className="mt-5 max-w-xl text-pretty text-base leading-7 text-[#526052] sm:text-lg">
             {hopeStatement}
           </p>
+          <BadgeBpom nomorBpom={nomorBpom} halalTersertifikasi={halalTersertifikasi} />
+          {hargaDiskon !== undefined && (
+            <div className="mt-5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span className="text-2xl font-bold text-[#35513a]">
+                {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(hargaDiskon)}
+              </span>
+              {hargaUtama !== undefined && hargaUtama > hargaDiskon && (
+                <span className="text-sm text-[#526052] line-through">
+                  {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(hargaUtama)}
+                </span>
+              )}
+              {!!persenHemat && persenHemat > 0 && (
+                <span className="rounded-full bg-[#dce6d0] px-2.5 py-1 text-xs font-semibold text-[#35513a]">
+                  Hemat {persenHemat}%
+                </span>
+              )}
+              {hargaPerHari !== null && hargaPerHari !== undefined && (
+                <span className="w-full text-xs text-[#526052]">Sekitar {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(hargaPerHari)} per hari</span>
+              )}
+            </div>
+          )}
           <div className="mt-8 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
             <button
               type="button"
@@ -40,14 +77,13 @@ export function Hero({
               Beli Sekarang
               <ArrowRight className="size-4" aria-hidden="true" />
             </button>
-            <button
-              type="button"
-              onClick={onChatClick}
+            <Link
+              href="#edukasi"
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-[#78936f] bg-transparent px-6 py-3 text-sm font-semibold text-[#35513a] transition hover:bg-[#e5eddc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#78936f] focus-visible:ring-offset-2"
             >
-              <MessageCircle className="size-5" aria-hidden="true" />
-              Chat Saya
-            </button>
+              Kenali cara kerjanya
+              <ArrowRight className="size-4" aria-hidden="true" />
+            </Link>
           </div>
         </div>
 

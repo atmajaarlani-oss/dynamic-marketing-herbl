@@ -1,73 +1,59 @@
 export const runtime = "edge"
 
 import { notFound } from "next/navigation"
-import { createClient } from "@/lib/supabase"
-import { CaraPakai } from "@/components/landing/CaraPakai"
-import { DetailKandungan } from "@/components/landing/DetailKandungan"
-import { KeunggulanInsani } from "@/components/landing/KeunggulanInsani"
-import { RiskReversal } from "@/components/landing/RiskReversal"
+import Hero from "@/components/landing/Hero"
 import { ValidasiMasalah } from "@/components/landing/ValidasiMasalah"
+import { EdukasiRingan } from "@/components/landing/EdukasiRingan"
+import { SocialProof } from "@/components/landing/SocialProof"
+import { PerbandinganNilai } from "@/components/landing/PerbandinganNilai"
+import { DetailKandungan } from "@/components/landing/DetailKandungan"
+import { CaraPakai } from "@/components/landing/CaraPakai"
+import { KeunggulanInsani } from "@/components/landing/KeunggulanInsani"
+import { TransaksiChat } from "@/components/landing/TransaksiChat"
+import { RiskReversal } from "@/components/landing/RiskReversal"
+import { createClient } from "@/lib/supabase"
+import { PENGATURAN_GLOBAL } from "@/lib/pengaturan-global"
 import { formatRupiah } from "@/lib/dummy-produk"
+import { hitungPersenHemat } from "@/lib/harga"
+import { getProductDetails, getProductImage, firstNonEmpty, formatStock, type ProdukRow } from "@/lib/produk-view-model"
 
-function splitText(value: string | null | undefined) {
-  return (value ?? "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean)
-}
-
-export default async function ProdukDetailPage({
-  params,
-}: {
-  params: Promise<{ slug: string }>
-}) {
+export default async function ProdukDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const supabase = await createClient()
-  const { data: produk, error } = await supabase
-    .from("produk")
-    .select("*")
-    .eq("slug", slug)
-    .eq("is_active", true)
-    .single()
-
+  const { data: produk, error } = await supabase.from("produk").select("*").eq("slug", slug).eq("is_active", true).single()
   if (error || !produk) notFound()
 
-  const indikasi = splitText(produk.indikasi)
-  const kontraindikasi = splitText(produk.kontraindikasi)
-  const kandungan = splitText(produk.kandungan)
+  const product = produk as ProdukRow
+  const details = getProductDetails(product)
+  const painHeadline = firstNonEmpty(product.headline_pain, details.indikasi[0], product.nama_produk)
+  const hopeStatement = firstNonEmpty(product.sub_headline_harapan, product.fungsi_utama, product.informasi, "Dukungan herbal untuk menemani ikhtiar harian Anda.")
+  const whatsappNumber = PENGATURAN_GLOBAL.kontakWhatsapp.replace(/\D/g, "").replace(/^0/, "62")
 
   return (
     <main className="min-h-screen bg-background text-foreground">
-      <section className="mx-auto grid max-w-6xl gap-8 px-5 py-12 sm:px-8 lg:grid-cols-2 lg:items-center lg:py-20">
-        <div className="relative flex min-h-80 items-center justify-center overflow-hidden rounded-2xl bg-muted p-8 shadow-sm">
-          {produk.gambar ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={produk.gambar} alt={`Foto ${produk.nama_produk}`} className="max-h-96 w-full object-contain" />
-          ) : (
-            <span className="text-sm text-muted-foreground">Foto produk</span>
-          )}
-        </div>
-        <section className="space-y-6">
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">Herbal Insani</p>
-          <h1 className="text-balance text-4xl font-bold tracking-tight sm:text-5xl">{produk.nama_produk}</h1>
-          {produk.deskripsi && <p className="text-lg leading-8 text-muted-foreground">{produk.deskripsi}</p>}
-          <ul className="grid gap-3 sm:grid-cols-2">
-            {indikasi.map((item) => <li key={item} className="rounded-xl border bg-card p-4 text-sm shadow-sm">{item}</li>)}
-          </ul>
-          <div className="rounded-2xl border bg-card p-6 shadow-sm">
-            <p className="text-3xl font-bold text-primary">{formatRupiah(produk.harga_diskon)}</p>
-            <p className="text-sm text-muted-foreground line-through">{formatRupiah(produk.harga_utama)}</p>
+      <Hero painHeadline={painHeadline} hopeStatement={hopeStatement} namaProduk={product.nama_produk ?? slug} gambar={getProductImage(product.gambar)} hargaUtama={Number(product.harga_utama ?? 0)} hargaDiskon={Number(product.harga_diskon ?? 0)} hargaPerHari={details.hargaPerHari} persenHemat={hitungPersenHemat(Number(product.harga_utama ?? 0), Number(product.harga_diskon ?? 0))} nomorBpom={product.bpom ?? product.nomor_bpom} halalTersertifikasi={PENGATURAN_GLOBAL.halalTersertifikasi} />
+      <ValidasiMasalah poinKeluhan={details.indikasi} />
+      <EdukasiRingan penjelasan={details.edukasi} namaProduk={product.nama_produk ?? slug} poin={details.edukasiPoin} />
+      <SocialProof />
+      <PerbandinganNilai />
+      <DetailKandungan sections={details.detailSections} />
+      <CaraPakai steps={details.aturanPakai} />
+      {details.kontraindikasi.length > 0 && (
+        <section className="bg-background px-4 py-14 sm:px-6 lg:px-8" aria-labelledby="kontraindikasi-title">
+          <div className="mx-auto max-w-3xl rounded-2xl border border-amber-200 bg-card p-6 shadow-sm sm:p-8">
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">Kontraindikasi</p>
+            <h2 id="kontraindikasi-title" className="mt-2 text-2xl font-semibold text-foreground">konsultasikan dahulu jika ada kondisi</h2>
+            <ul className="mt-5 grid gap-3 sm:grid-cols-2">{details.kontraindikasi.map((item) => <li key={item} className="rounded-xl border border-border bg-card p-4 text-sm leading-6">{item}</li>)}</ul>
           </div>
         </section>
-      </section>
-      <div className="mx-auto grid max-w-6xl gap-10 px-5 pb-16 sm:px-8">
-        <ValidasiMasalah poinKeluhan={indikasi} />
-        <DetailKandungan items={kandungan.map((nama) => ({ title: nama, content: "Kandungan pilihan yang digunakan dalam formula produk." }))} />
-        <CaraPakai steps={[]} />
-        <KeunggulanInsani />
-        <RiskReversal />
-        {kontraindikasi.length > 0 && <section className="rounded-2xl border bg-card p-6"><h2 className="font-semibold">Perhatian</h2><ul className="mt-3 list-disc pl-5 text-sm text-muted-foreground">{kontraindikasi.map((item) => <li key={item}>{item}</li>)}</ul></section>}
-      </div>
+      )}
+      <KeunggulanInsani producerName="PT Insani" story={PENGATURAN_GLOBAL.keunggulanPtInsani} />
+      <TransaksiChat whatsappNumber={whatsappNumber} />
+      <RiskReversal policy={`${PENGATURAN_GLOBAL.syaratKetentuan} ${PENGATURAN_GLOBAL.disclaimerMedis}`} />
+      <footer className="border-t border-border bg-muted/30 px-4 py-8 text-center text-sm text-muted-foreground">
+        <p>{product.nama_produk} · {formatStock(product.stok)} · {product.isi ? `Isi ${product.isi}` : formatRupiah(Number(product.harga_diskon ?? 0))}</p>
+        <p className="mt-2">{PENGATURAN_GLOBAL.infoPengiriman}</p>
+      </footer>
     </main>
   )
 }
