@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { createBrowserSupabase } from "@/lib/supabase-browser"
 import { useRouter } from "next/navigation"
 
 type FormValue = string | number | boolean | null
@@ -22,8 +23,32 @@ export default function ProdukForm({ initial = {}, id }: { initial?: ProdukFormD
   const [form, setForm] = useState<ProdukFormData>({ ...defaults, ...initial })
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState("")
+  const [uploading, setUploading] = useState(false)
+  const supabase = createBrowserSupabase()
 
   function update(key: string, value: FormValue) { setForm((current) => ({ ...current, [key]: value })) }
+
+  async function handleUploadGambar(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith("image/")) {
+      setMessage("Pilih file gambar yang valid.")
+      return
+    }
+    setUploading(true)
+    setMessage("")
+    const folder = String(form.komposisi ?? "").includes(",") ? "campuran" : "satuan"
+    const safeName = file.name.toLowerCase().replace(/[^a-z0-9._-]/g, "-")
+    const namaFile = `${folder}/${Date.now()}-${safeName}`
+    const { error } = await supabase.storage.from("multimedia").upload(namaFile, file, { upsert: false })
+    if (error) {
+      setMessage("Gambar belum berhasil diunggah. Periksa bucket multimedia.")
+    } else {
+      const { data } = supabase.storage.from("multimedia").getPublicUrl(namaFile)
+      update("gambar", data.publicUrl)
+    }
+    setUploading(false)
+  }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setSaving(true); setMessage("")
@@ -34,7 +59,7 @@ export default function ProdukForm({ initial = {}, id }: { initial?: ProdukFormD
   }
 
   return <form onSubmit={submit} className="mx-auto max-w-4xl space-y-6">
-    {sections.map((section) => <section key={section.title} className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6"><h2 className="mb-5 text-lg font-semibold text-foreground">{section.title}</h2><div className="grid gap-5 sm:grid-cols-2">{section.fields.map(([key, label, type]) => <label key={key} className={type === "textarea" || key === "gambar" ? "sm:col-span-2" : ""}><span className="mb-2 block text-sm font-medium text-foreground">{label}</span>{type === "textarea" ? <textarea rows={key === "cerita_singkat" ? 3 : 4} value={String(form[key] ?? "")} onChange={(event) => update(key, event.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm leading-6 outline-none transition focus:ring-2 focus:ring-primary" /> : <input type={type} min={type === "number" ? 0 : undefined} value={String(form[key] ?? "")} onChange={(event) => update(key, type === "number" ? (event.target.value === "" ? null : Number(event.target.value)) : event.target.value)} className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none transition focus:ring-2 focus:ring-primary" />}</label>)}</div>{section.title === "Cara Pakai" && <p className="mt-4 text-xs leading-5 text-muted-foreground">Gunakan koma untuk memisahkan beberapa poin. Jumlah satuan dan dosis harian dipakai untuk menghitung harga per hari.</p>}</section>)}
+    {sections.map((section) => <section key={section.title} className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6"><h2 className="mb-5 text-lg font-semibold text-foreground">{section.title}</h2><div className="grid gap-5 sm:grid-cols-2">{section.fields.map(([key, label, type]) => <label key={key} className={type === "textarea" || key === "gambar" ? "sm:col-span-2" : ""}><span className="mb-2 block text-sm font-medium text-foreground">{label}</span>{type === "textarea" ? <textarea rows={key === "cerita_singkat" ? 3 : 4} value={String(form[key] ?? "")} onChange={(event) => update(key, event.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm leading-6 outline-none transition focus:ring-2 focus:ring-primary" /> : <input type={type} min={type === "number" ? 0 : undefined} value={String(form[key] ?? "")} onChange={(event) => update(key, type === "number" ? (event.target.value === "" ? null : Number(event.target.value)) : event.target.value)} className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none transition focus:ring-2 focus:ring-primary" />}</label>)}</div>{section.title === "Cara Pakai" && <p className="mt-4 text-xs leading-5 text-muted-foreground">Gunakan koma untuk memisahkan beberapa poin. Jumlah satuan dan dosis harian dipakai untuk menghitung harga per hari.</p>}{section.title === "Harga, Stok, dan Media" && <div className="mt-5 rounded-xl border border-dashed border-border bg-background p-4"><label className="block"><span className="mb-2 block text-sm font-medium text-foreground">Upload gambar ke bucket multimedia</span><input type="file" accept="image/*" onChange={handleUploadGambar} disabled={uploading} className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-lg file:border-0 file:bg-primary file:px-3 file:py-2 file:font-medium file:text-primary-foreground" /></label>{uploading && <p className="mt-2 text-sm text-muted-foreground">Mengunggah gambar...</p>}</div>}</section>)}
     <label className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4"><input type="checkbox" checked={form.is_active !== false} onChange={(event) => update("is_active", event.target.checked)} className="h-4 w-4 accent-primary" /><span className="text-sm font-medium text-foreground">Produk aktif dan tampil di katalog</span></label>
     {!String(form.nomor_bpom ?? "").trim() && form.is_active !== false && <p className="rounded-xl bg-amber-50 p-3 text-sm leading-6 text-amber-700">Nomor BPOM belum diisi. Produk tetap bisa aktif, tapi badge legalitas tidak akan muncul di landing page.</p>}
     {message && <p role="alert" className="text-sm text-destructive">{message}</p>}
