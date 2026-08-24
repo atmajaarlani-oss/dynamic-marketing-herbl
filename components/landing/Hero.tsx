@@ -85,6 +85,13 @@ export function Hero({
               <ArrowRight className="size-4" aria-hidden="true" />
             </Link>
           </div>
+          <Link
+            href="/home"
+            className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[#526052] underline decoration-[#78936f] decoration-2 underline-offset-4 transition hover:text-[#35513a]"
+          >
+            Lihat semua produk herbal
+            <ArrowRight className="size-4" aria-hidden="true" />
+          </Link>
         </div>
 
         <div className="order-1 flex min-h-72 items-center justify-center rounded-2xl bg-[#e5eddc] p-5 sm:min-h-96 sm:p-8 lg:order-2">
