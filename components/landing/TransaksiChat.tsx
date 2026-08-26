@@ -9,6 +9,7 @@ type TransaksiChatProps = {
   whatsappNumber?: string
   hargaProduk?: number
   beratPerUnit?: number
+  productId?: string
 }
 
 interface CourierOption {
@@ -29,8 +30,10 @@ export function TransaksiChat({
   whatsappNumber = '6281234567890',
   hargaProduk = 150000,
   beratPerUnit = 1000,
+  productId,
 }: TransaksiChatProps) {
   const [currentStep, setCurrentStep] = useState<Step>(1)
+  const [loading, setLoading] = useState(false)
   const formCardRef = useRef<HTMLDivElement>(null)
 
   const [name, setName] = useState('')
@@ -206,9 +209,56 @@ export function TransaksiChat({
     if (currentStep === 3) goToStep(2)
   }
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    alert(`Pesanan dikirim!\nTotal: ${formatRupiah(total)}\nKurir: ${selectedCourier?.courier_name} ${selectedCourier?.service}`)
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setLoading(true);
+
+    // Ambil data dari state yang sudah ada (name, phone, address, selectedCourier, dll)
+    const payload = {
+      produk_id: productId,       // pastikan ada prop productId (atau ambil dari props)
+      jumlah: 1,                  // bisa disesuaikan jika ada input jumlah
+      nama_pembeli: name,
+      no_hp: phone,
+      alamat: address,
+      kurir_kode: selectedCourier?.courier_name,
+      kurir_layanan: selectedCourier?.service,
+      ongkir: selectedCourier?.harga,
+    };
+
+    try {
+      const res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Gagal checkout');
+
+      // Pastikan Snap sudah dimuat
+      if (window.snap && data.snap_token) {
+        window.snap.pay(data.snap_token, {
+          onSuccess: function(result) {
+            alert('Pembayaran!');
+            // Bisa redirect atau reset form
+          },
+          onPending: function(result) {
+            alert('Pembayaran pending');
+          },
+          onError: function(result) {
+            alert('Pembayaran gagal');
+          },
+          onClose: function() {
+            alert('Anda menutup popup tanpa menyelesaikan pembayaran');
+          }
+        });
+      } else {
+        alert('Snap tidak tersedia. Pastikan script Snap sudah dimuat.');
+      }
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   const steps: { step: Step; label: string; icon: React.ReactNode }[] = [
@@ -506,9 +556,10 @@ export function TransaksiChat({
                   </Button>
                   <Button
                     type="submit"
-                    className="rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground transition hover:opacity-90"
+                    disabled={loading}
+                    className="rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
                   >
-                    Bayar Sekarang
+                    {loading ? 'Memproses...' : 'Bayar Sekarang'}
                   </Button>
                 </div>
               </>
@@ -539,3 +590,4 @@ export function TransaksiChat({
     </section>
   )
 }
+```
