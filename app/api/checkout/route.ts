@@ -4,13 +4,11 @@ import { createClient } from '@/lib/supabase'
 import midtransClient from 'midtrans-client'
 
 // -----------------------------------------------------------------------------
-// Initialise Supabase server-side client and Midtrans Snap client.
+// Initialise Midtrans Snap client.
 // NOTE: We rely on NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY
 // inside `createClient()`. The server key for Midtrans comes from
 // MIDTRANS_SERVER_KEY (and client key from MIDTRANS_CLIENT_KEY).
 // -----------------------------------------------------------------------------
-const supabase = await createClient()
-
 const snap = new midtransClient.Snap({
   isProduction: process.env.NODE_ENV === 'production',
   serverKey: process.env.MIDTRANS_SERVER_KEY ?? '',
@@ -168,6 +166,8 @@ export async function POST(request: NextRequest) {
     // -------------------------------------------------------------------------
     // 2) Fetch product prices from the database (server is the source of truth)
     // -------------------------------------------------------------------------
+    const supabase = await createClient()
+
     const productIds = normalisedItems.map((item) => item.product_id)
 
     const { data: productsData, error: productsError } = await supabase
