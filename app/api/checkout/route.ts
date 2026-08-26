@@ -5,9 +5,6 @@ import midtransClient from 'midtrans-client'
 
 // -----------------------------------------------------------------------------
 // Set up Midtrans Snap client.
-// NOTE: We rely on NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY
-// inside `createClient()`. The server key for Midtrans comes from
-// MIDTRANS_SERVER_KEY (and client key from MIDTRANS_CLIENT_KEY).
 // -----------------------------------------------------------------------------
 const snap = new midtransClient.Snap({
   isProduction: process.env.NODE_ENV === 'production',
@@ -18,38 +15,15 @@ const snap = new midtransClient.Snap({
 // -----------------------------------------------------------------------------
 // Types
 // -----------------------------------------------------------------------------
-interface CheckoutItemInput {
-  product_id: string
-  quantity: number
-}
-
-interface CheckoutBuyer {
-  name?: string
-  first_name?: string
-  last_name?: string
-  email?: string
-  phone?: string
-  address?: string
-  city?: string
-  postal_code?: string
-  country_code?: string
-  notes?: string
-  [key: string]: unknown
-}
-
-interface CheckoutCourier {
-  courier_code: string
-  courier_service_code: string
-  courier_name?: string
-  service?: string
-  price?: number
-  duration?: string
-}
-
 interface CheckoutRequestBody {
-  items: CheckoutItemInput[]
-  buyer: CheckoutBuyer
-  courier: CheckoutCourier
+  produk_id: string
+  jumlah: number
+  nama_pembeli: string
+  no_hp: string
+  alamat: string
+  kurir_kode: string
+  kurir_layanan: string
+  ongkir: number
 }
 
 interface ProductRow {
@@ -90,7 +64,6 @@ function firstNonEmpty(...values: Array<string | null | undefined>): string {
 }
 
 function toRupiahAmount(value: number): number {
-  // Midtrans requires integer gross_amount.
   return Math.round(Number(value) || 0)
 }
 
@@ -103,12 +76,6 @@ function asString(value: unknown): string {
 
 // -----------------------------------------------------------------------------
 // POST /api/checkout
-//   - validates payload
-//   - fetches product prices from DB (never trusts the client)
-//   - recalculates shipping fee using the courier selection
-//   - inserts a `pending` order row into the `pesanan` table
-//   - creates a Midtrans Snap transaction
-//   - returns the Snap token to the frontend
 // -----------------------------------------------------------------------------
 export async function POST(request: NextRequest) {
   try {
@@ -132,230 +99,123 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const items = Array.isArray(body?.items) ? body.items : []
-    // Validate that each item has a product_id (remove empty‑cart check)
-    for (const item of items) {
-      const productId = asString(item?.product_id)
-      if (!productId) {
+    // Log payload for debugging
+    console.log('[checkout] Payload received:', body)
+
+    // Validate required fields
+    const requiredFields: { key: keyof CheckoutRequestBody; label: string }[] = [
+      { key: 'produk_id', label: 'produk_id' },
+      { key: 'jumlah', label: 'jumlah' },
+      { key: 'nama_pembeli', label: 'nama_pembeli' },
+      { key: 'no_hp', label: 'no_hp' },
+      { key: 'alamat', label: 'alamat' },
+      { key: 'kurir_kode', label: 'kurir_kode' },
+      { key: 'kurir_layanan', label: 'kurir_layanan' },
+      { key: 'ongkir', label: 'ongkir' },
+    ]
+
+    for (const field of requiredFields) {
+      const value = body[field.key]
+      if (value === undefined || value === null || (typeof value === 'string' && value.trim() === '')) {
         return NextResponse.json(
-          { error: 'produk_id wajib' },
+          { error: `${field.label} wajib diisi.` },
           { status: 400 },
         )
       }
     }
 
-    const buyer = body?.buyer ?? ({} as CheckoutBuyer)
-    const courier = body?.courier
-
-    if (!courier || !courier.courier_code || !courier.courier_service_code) {
+    const produkId = asString(body.produk_id)
+    const jumlah = Number(body.jumlah)
+    if (!Number.isFinite(jumlah) || jumlah <= 0 || !Number.isInteger(jumlah)) {
       return NextResponse.json(
-        { error: 'Selected courier is missing courier_code or service code.' },
+        { error: 'jumlah harus berupa bilangan bulat positif.' },
         { status: 400 },
       )
     }
 
-    // Normalise each item so the rest of the handler can rely on numeric
-    // quantities and non-empty product ids.
-    const normalisedItems = items.map((item, index) => {
-      const productId = asString(item?.product_id)
-      const quantity = Number(item?.quantity)
-      if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isInteger(quantity)) {
-        throw Object.assign(
-          new Error(`Item at index ${index} has an invalid quantity.`),
-          { status: 400 },
-        )
-      }
-      return { product_id: productId, quantity }
-    })
+    const ongkir = Number(body.ongkir)
+    if (!Number.isFinite(ongkir) || ongkir < 0) {
+      return NextResponse.json(
+        { error: 'ongkir harus berupa angka valid.' },
+        { status: 400 },
+      )
+    }
 
     // -------------------------------------------------------------------------
-    // 2) Fetch product prices from the database (server is the source of truth)
+    // 2) Fetch product from the database
     // -------------------------------------------------------------------------
     const supabase = await createClient()
-
-    const productIds = normalisedItems.map((item) => item.product_id)
 
     const { data: productsData, error: productsError } = await supabase
       .from('produk')
       .select('id, nama_produk, harga_utama, harga_diskon, berat')
-      .in('id', productIds)
+      .eq('id', produkId)
 
     if (productsError) {
-      console.error('[checkout] failed to fetch products', productsError)
+      console.error('[checkout] failed to fetch product', productsError)
       return NextResponse.json(
         { error: 'Failed to load product information.' },
         { status: 500 },
       )
     }
 
-    const products = (productsData ?? []) as ProductRow[]
-    if (products.length !== new Set(productIds).size) {
-      const found = new Set(products.map((p) => p.id))
-      const missing = productIds.filter((id) => !found.has(id))
+    const product = (productsData ?? [])[0] as ProductRow | undefined
+    if (!product) {
       return NextResponse.json(
-        { error: `One or more products could not be found: ${missing.join(', ')}` },
+        { error: 'Produk tidak ditemukan.' },
         { status: 404 },
       )
     }
 
-    const productById = new Map<string, ProductRow>()
-    for (const product of products) productById.set(product.id, product)
-
     // -------------------------------------------------------------------------
-    // 3) Recalculate subtotals and total on the server
+    // 3) Calculate prices
     // -------------------------------------------------------------------------
-    type PricedItem = {
-      product_id: string
-      product_name: string
-      quantity: number
-      unit_price: number
-      subtotal: number
-    }
+    const unitPrice = product.harga_diskon && Number(product.harga_diskon) > 0
+      ? Number(product.harga_diskon)
+      : Number(product.harga_utama)
 
-    // Build priced items using the already‑validated `items` array
-    const pricedItems: PricedItem[] = normalisedItems.map(item => {
-      const product = productById.get(item.product_id)!
-      const unitPrice = product.harga_diskon && Number(product.harga_diskon) > 0
-        ? Number(product.harga_diskon)
-        : Number(product.harga_utama)
-
-      if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
-        throw Object.assign(
-          new Error(`Product ${product.id} has an invalid price.`),
-          { status: 400 },
-        )
-      }
-
-      const subtotal = unitPrice * item.quantity
-      return {
-        product_id: product.id,
-        product_name: firstNonEmpty(product.nama_produk, product.id),
-        quantity: item.quantity,
-        unit_price: unitPrice,
-        subtotal,
-      }
-    })
-
-    const itemsSubtotal = pricedItems.reduce((sum, item) => sum + item.subtotal, 0)
-
-    // -------------------------------------------------------------------------
-    // 4) Recalculate shipping fee for the selected courier (server-side)
-    // -------------------------------------------------------------------------
-    if (!process.env.BITESHIP_API_KEY) {
+    if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
       return NextResponse.json(
-        { error: 'BITESHIP_API_KEY is not configured on the server.' },
-        { status: 500 },
-      )
-    }
-
-    const destinationAreaId = asString(buyer.destination_area_id) || asString(buyer.area_id)
-    if (!destinationAreaId) {
-      return NextResponse.json(
-        { error: 'Buyer destination_area_id is required to recompute shipping.' },
+        { error: 'Harga produk tidak valid.' },
         { status: 400 },
       )
     }
 
-    // Estimate total weight: if a product specifies `berat` (grams) we sum it
-    // by quantity, otherwise we fall back to 1000 g per item.
-    const totalWeight = pricedItems.reduce((sum, item) => {
-      const product = productById.get(item.product_id)!
-      const perUnit = Number(product.berat) > 0 ? Number(product.berat) : 1000
-      return sum + perUnit * item.quantity
-    }, 0)
+    const subtotalProduk = unitPrice * jumlah
+    const totalBayar = toRupiahAmount(subtotalProduk + ongkir)
 
-    const biteshipResponse = await fetch('https://api.biteship.com/v1/rates/couriers', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: process.env.BITESHIP_API_KEY,
-      },
-      body: JSON.stringify({
-        origin_area_id: process.env.BITESHIP_ORIGIN_AREA_ID,
-        destination_area_id: destinationAreaId,
-        couriers: `${courier.courier_code}:${courier.courier_service_code}`,
-        items: pricedItems.map((item) => ({
-          name: item.product_name,
-          value: item.unit_price,
-          quantity: item.quantity,
-          weight: Number(productById.get(item.product_id)!.berat) > 0
-            ? Number(productById.get(item.product_id)!.berat)
-            : 1000,
-        })),
-      }),
-    })
-
-    if (!biteshipResponse.ok) {
-      const errorText = await biteshipResponse.text().catch(() => '')
-      console.error('[checkout] Biteship rates lookup failed', biteshipResponse.status, errorText)
+    if (totalBayar <= 0) {
       return NextResponse.json(
-        { error: 'Failed to recompute shipping fee. Please try again.' },
-        { status: 502 },
-      )
-    }
-
-    const biteshipPayload = (await biteshipResponse.json()) as {
-      success?: boolean
-      pricing?: Array<{
-        courier_code: string
-        courier_service_code: string
-        price: number
-        duration?: string
-      }>
-      error?: string
-    }
-
-    const matchedRate = (biteshipPayload.pricing ?? []).find(
-      (rate) =>
-        rate.courier_code === courier.courier_code &&
-        rate.courier_service_code === courier.courier_service_code,
-    )
-
-    if (!matchedRate) {
-      return NextResponse.json(
-        {
-          error: 'Selected courier is no longer available for this destination. Please pick another option.',
-        },
-        { status: 409 },
-      )
-    }
-
-    const shippingFee = Number(matchedRate.price) || 0
-    const grossAmount = toRupiahAmount(itemsSubtotal + shippingFee)
-
-    if (grossAmount <= 0) {
-      return NextResponse.json(
-        { error: 'Computed total amount is invalid.' },
+        { error: 'Total amount tidak valid.' },
         { status: 400 },
       )
     }
 
     // -------------------------------------------------------------------------
-    // 5) Insert a new `pending` order row
+    // 4) Create order ID and insert into pesanan
     // -------------------------------------------------------------------------
     const orderId = `ORD-${Date.now()}-${randomUUID().slice(0, 8).toUpperCase()}`
 
-    const buyerName = firstNonEmpty(buyer.name, [buyer.first_name, buyer.last_name].filter(Boolean).join(' '))
-    const buyerEmail = firstNonEmpty(buyer.email)
-    const buyerPhone = firstNonEmpty(buyer.phone)
-    const buyerAddress = firstNonEmpty(buyer.address)
+    const buyerName = firstNonEmpty(body.nama_pembeli)
+    const buyerPhone = firstNonEmpty(body.no_hp)
+    const buyerAddress = firstNonEmpty(body.alamat)
 
     const pesananInsert = {
       order_id: orderId,
-      product_id: pricedItems.map((item) => item.product_id).join(','),
-      quantity: pricedItems.reduce((sum, item) => sum + item.quantity, 0),
-      subtotal: toRupiahAmount(itemsSubtotal),
-      shipping_fee: toRupiahAmount(shippingFee),
-      total_amount: grossAmount,
+      product_id: produkId,
+      quantity: jumlah,
+      subtotal: toRupiahAmount(subtotalProduk),
+      shipping_fee: toRupiahAmount(ongkir),
+      total_amount: totalBayar,
       status: 'pending',
       buyer_name: buyerName || null,
-      buyer_email: buyerEmail || null,
+      buyer_email: null,
       buyer_phone: buyerPhone || null,
       buyer_address: buyerAddress || null,
-      courier_code: courier.courier_code,
-      courier_service_code: courier.courier_service_code,
-      courier_name: courier.courier_name ?? matchedRate.courier_code,
-      courier_service_name: courier.service ?? matchedRate.courier_service_code,
+      courier_code: body.kurir_kode,
+      courier_service_code: body.kurir_layanan,
+      courier_name: body.kurir_kode,
+      courier_service_name: body.kurir_layanan,
     }
 
     const { data: insertedOrder, error: insertError } = await supabase
@@ -375,46 +235,48 @@ export async function POST(request: NextRequest) {
     const savedOrder = insertedOrder as PesananRow
 
     // -------------------------------------------------------------------------
-    // 6) Ask Midtrans Snap for a transaction token
+    // 5) Ask Midtrans Snap for a transaction token
     // -------------------------------------------------------------------------
     const midtransParameter = {
       transaction_details: {
         order_id: orderId,
-        gross_amount: grossAmount,
+        gross_amount: totalBayar,
       },
       customer_details: {
-        first_name: buyer.first_name ?? buyerName.split(' ')[0] ?? '',
-        last_name: buyer.last_name ?? buyerName.split(' ').slice(1).join(' ') ?? '',
-        email: buyerEmail,
+        first_name: buyerName,
+        last_name: '',
+        email: '',
         phone: buyerPhone,
         billing_address: {
-          first_name: buyer.first_name ?? '',
-          last_name: buyer.last_name ?? '',
-          email: buyerEmail,
+          first_name: buyerName,
+          last_name: '',
+          email: '',
           phone: buyerPhone,
           address: buyerAddress,
-          city: asString(buyer.city),
-          postal_code: asString(buyer.postal_code),
-          country_code: firstNonEmpty(buyer.country_code, 'ID'),
+          city: '',
+          postal_code: '',
+          country_code: 'ID',
         },
         shipping_address: {
-          first_name: buyer.first_name ?? '',
-          last_name: buyer.last_name ?? '',
-          email: buyerEmail,
+          first_name: buyerName,
+          last_name: '',
+          email: '',
           phone: buyerPhone,
           address: buyerAddress,
-          city: asString(buyer.city),
-          postal_code: asString(buyer.postal_code),
-          country_code: firstNonEmpty(buyer.country_code, 'ID'),
+          city: '',
+          postal_code: '',
+          country_code: 'ID',
         },
       },
-      item_details: pricedItems.map((item) => ({
-        id: item.product_id,
-        name: item.product_name,
-        price: toRupiahAmount(item.unit_price),
-        quantity: item.quantity,
-      })),
-      shipping_cost: toRupiahAmount(shippingFee),
+      item_details: [
+        {
+          id: product.id,
+          name: firstNonEmpty(product.nama_produk, product.id),
+          price: toRupiahAmount(unitPrice),
+          quantity: jumlah,
+        },
+      ],
+      shipping_cost: toRupiahAmount(ongkir),
     }
 
     let snapResponse: { token: string; redirect_url?: string }
@@ -423,7 +285,6 @@ export async function POST(request: NextRequest) {
       snapResponse = { token: tx.token, redirect_url: tx.redirect_url }
     } catch (midtransError) {
       console.error('[checkout] Midtrans createTransaction failed', midtransError)
-      // Mark the order as failed so we don't leave a dangling pending row.
       await supabase
         .from('pesanan')
         .update({ status: 'failed' })
@@ -435,7 +296,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Optionally persist the Snap token / redirect URL for reference.
+    // Persist the Snap token / redirect URL
     await supabase
       .from('pesanan')
       .update({
@@ -445,14 +306,14 @@ export async function POST(request: NextRequest) {
       .eq('order_id', orderId)
 
     // -------------------------------------------------------------------------
-    // 7) Respond with the Snap token and order id
+    // 6) Respond with the Snap token and order id
     // -------------------------------------------------------------------------
     return NextResponse.json(
       {
         token: snapResponse.token,
         order_id: orderId,
         pesanan_id: savedOrder.id,
-        total_amount: grossAmount,
+        total_amount: totalBayar,
         snap_redirect_url: snapResponse.redirect_url ?? null,
       },
       { status: 200 },
