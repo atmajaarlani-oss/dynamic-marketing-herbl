@@ -1,4 +1,5 @@
 export type ProdukRow = Record<string, unknown> & {
+  id?: string | null
   nama_produk?: string | null
   indikasi?: string | null
   kontraindikasi?: string | null

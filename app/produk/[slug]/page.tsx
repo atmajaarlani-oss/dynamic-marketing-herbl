@@ -48,7 +48,12 @@ export default async function ProdukDetailPage({ params }: { params: Promise<{ s
         </section>
       )}
       <KeunggulanInsani producerName="PT Insani" story={PENGATURAN_GLOBAL.keunggulanPtInsani} />
-      <TransaksiChat whatsappNumber={whatsappNumber} hargaProduk={Number(product.harga_diskon ?? 0)} beratPerUnit={Number(product.berat_gram ?? 1000)} />
+      <TransaksiChat
+        whatsappNumber={whatsappNumber}
+        hargaProduk={Number(product.harga_diskon ?? 0)}
+        beratPerUnit={Number(product.berat_gram ?? 1000)}
+        productId={String(product.id)}
+      />
       <RiskReversal policy={`${PENGATURAN_GLOBAL.syaratKetentuan} ${PENGATURAN_GLOBAL.disclaimerMedis}`} />
       <footer className="border-t border-border bg-muted/30 px-4 py-8 text-center text-sm text-muted-foreground">
         <p>{product.nama_produk} · {formatStock(product.stok)} · {product.isi ? `Isi ${product.isi}` : formatRupiah(Number(product.harga_diskon ?? 0))}</p>
