@@ -8,7 +8,7 @@ import { ChevronRight, ChevronLeft, Truck, CreditCard, User, MapPin, CheckCircle
 type TransaksiChatProps = {
   whatsappNumber?: string
   hargaProduk?: number
-  beratPerUnit?: number // in grams, default 1000g (1 kg)
+  beratPerUnit?: number
 }
 
 interface CourierOption {
@@ -32,13 +32,11 @@ export function TransaksiChat({
 }: TransaksiChatProps) {
   const [currentStep, setCurrentStep] = useState<Step>(1)
 
-  // Step 1: Personal info
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [address, setAddress] = useState('')
   const [quantity, setQuantity] = useState(1)
 
-  // Step 2: Area search & courier selection
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<AreaSearchResult[]>([])
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null)
@@ -50,27 +48,26 @@ export function TransaksiChat({
   const [courierLoading, setCourierLoading] = useState(false)
   const [courierError, setCourierError] = useState<string | null>(null)
 
-  // Refs for abort controllers
   const searchControllerRef = useRef<AbortController | null>(null)
   const courierControllerRef = useRef<AbortController | null>(null)
 
-  // Computed values
   const subtotal = hargaProduk * quantity
   const ongkir = selectedCourier?.harga ?? 0
   const total = subtotal + ongkir
 
-  // Step 1 validation
-  const isStep1Valid = name.trim() && phone.trim() && address.trim() && quantity > 0
+  const isStep1Valid = name.trim() && phone.trim() && address.trim() && selectedAreaId !== null && quantity > 0
+  const isStep2Valid = selectedCourier !== null
 
-  // Step 2 validation
-  const isStep2Valid = selectedAreaId !== null && selectedCourier !== null
-
-  // Debounced area search (Step 2)
   useEffect(() => {
     if (!query.trim() || query.trim().length < 3) {
       setResults([])
       setSearchLoading(false)
       return
+    }
+
+    if (searchControllerRef.current) {
+      searchControllerRef.current.abort()
+      searchControllerRef.current = null
     }
 
     setSearchLoading(true)
@@ -119,19 +116,23 @@ export function TransaksiChat({
     }
   }, [query])
 
-  // Fetch courier rates when area is selected (Step 2)
   useEffect(() => {
+    if (currentStep !== 2) return
     if (!selectedAreaId) return
 
     if (courierControllerRef.current) {
       courierControllerRef.current.abort()
+      courierControllerRef.current = null
     }
+
     const controller = new AbortController()
     courierControllerRef.current = controller
 
     const totalWeight = quantity * beratPerUnit
     setCourierLoading(true)
     setCourierError(null)
+    setCourierList([])
+    setSelectedCourier(null)
 
     fetch('/api/ongkir', {
       method: 'POST',
@@ -145,11 +146,10 @@ export function TransaksiChat({
       .then(res => res.json())
       .then(data => {
         if (data.success && Array.isArray(data.data)) {
-          // Filter only JNE and J&T as requested
           const filtered = data.data.filter(
-            (c: CourierOption) => 
-              c.courier_name.toLowerCase().includes('jne') || 
-              c.courier_name.toLowerCase().includes('j&t') || 
+            (c: CourierOption) =>
+              c.courier_name.toLowerCase().includes('jne') ||
+              c.courier_name.toLowerCase().includes('j&t') ||
               c.courier_name.toLowerCase().includes('jnt')
           )
           setCourierList(filtered)
@@ -170,16 +170,17 @@ export function TransaksiChat({
       })
       .finally(() => setCourierLoading(false))
 
-    return () => controller.abort()
-  }, [selectedAreaId, quantity, beratPerUnit])
+    return () => {
+      controller.abort()
+      courierControllerRef.current = null
+    }
+  }, [currentStep, selectedAreaId, quantity, beratPerUnit])
 
   const handleSelectArea = (area: AreaSearchResult) => {
     setSelectedAreaId(area.id)
     setSelectedAreaName(area.name)
     setQuery(area.name)
     setResults([])
-    setSelectedCourier(null)
-    setCourierList([])
   }
 
   const handleQuantityChange = (value: number) => {
@@ -203,18 +204,15 @@ export function TransaksiChat({
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    // TODO: integrate with payment gateway (Midtrans Snap)
     alert(`Pesanan dikirim!\nTotal: ${formatRupiah(total)}\nKurir: ${selectedCourier?.courier_name} ${selectedCourier?.service}`)
   }
 
-  // Step indicator
   const steps: { step: Step; label: string; icon: React.ReactNode }[] = [
-    { step: 1, label: 'Data Diri', icon: <User className="h-4 w-4" /> },
+    { step: 1, label: 'Data & Alamat', icon: <User className="h-4 w-4" /> },
     { step: 2, label: 'Kurir', icon: <Truck className="h-4 w-4" /> },
     { step: 3, label: 'Bayar', icon: <CreditCard className="h-4 w-4" /> },
   ]
 
-  // Helper to determine courier radio class
   const getCourierRadioClass = (courier: CourierOption, selected: CourierOption | null) => {
     const isSelected = selected?.courier_name === courier.courier_name && selected?.service === courier.service
     return `flex items-center gap-3 rounded-xl border-2 p-3 text-sm cursor-pointer transition ${isSelected ? 'border-primary bg-primary/5' : 'border-border bg-background hover:bg-muted/50'}`
@@ -223,7 +221,6 @@ export function TransaksiChat({
   return (
     <section className="bg-background px-4 py-16 sm:px-6 lg:px-8" aria-labelledby="transaksi-title">
       <div className="mx-auto max-w-2xl">
-        {/* Step Indicator */}
         <div className="mb-8 flex items-center justify-center">
           <ol className="flex items-center" role="list" aria-label="Langkah pemesanan">
             {steps.map(({ step, label, icon }, index) => (
@@ -249,21 +246,19 @@ export function TransaksiChat({
           </ol>
         </div>
 
-        {/* Step Content */}
         <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
           <header className="mb-6">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
               Langkah {currentStep} dari 3
             </p>
             <h2 id="transaksi-title" className="mt-1 text-2xl font-semibold tracking-tight text-foreground">
-              {currentStep === 1 && 'Data Penerima'}
+              {currentStep === 1 && 'Data Penerima & Alamat'}
               {currentStep === 2 && 'Pilih Kurir'}
               {currentStep === 3 && 'Ringkasan & Bayar'}
             </h2>
           </header>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* ---------- STEP 1: Data Diri ---------- */}
             {currentStep === 1 && (
               <>
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -277,7 +272,6 @@ export function TransaksiChat({
                       placeholder="Nama penerima"
                     />
                   </label>
-
                   <label className="block text-sm font-medium text-foreground">
                     No HP
                     <input
@@ -303,6 +297,46 @@ export function TransaksiChat({
                   />
                 </label>
 
+                <div className="relative">
+                  <label className="block text-sm font-medium text-foreground">
+                    Cari Kecamatan / Kota Tujuan
+                    <input
+                      value={query}
+                      onChange={e => setQuery(e.target.value)}
+                      placeholder="Ketik minimal 3 huruf (contoh: Cilandak, Bandung)..."
+                      className="mt-2 w-full rounded-xl border border-input bg-background px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </label>
+                  {searchLoading && (
+                    <p className="mt-2 text-xs text-muted-foreground">Mencari area...</p>
+                  )}
+                  {results.length > 0 && (
+                    <ul className="absolute z-10 mt-1 w-full rounded-xl border border-border bg-card shadow-lg max-h-60 overflow-auto">
+                      {results.map(area => (
+                        <li key={area.id}>
+                          <button
+                            type="button"
+                            onClick={() => handleSelectArea(area)}
+                            className="w-full px-4 py-3 text-left text-sm hover:bg-muted"
+                          >
+                            <div className="flex items-center gap-2">
+                              <MapPin className="h-4 w-4 text-muted-foreground" />
+                              <span>{area.name}</span>
+                            </div>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {selectedAreaName && (
+                    <div className="mt-3 rounded-xl border border-primary/30 bg-primary/5 p-3">
+                      <p className="text-sm text-primary">
+                        <span className="font-medium">Area terpilih:</span> {selectedAreaName}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
                 <label className="block text-sm font-medium text-foreground">
                   Jumlah Beli
                   <input
@@ -327,108 +361,72 @@ export function TransaksiChat({
               </>
             )}
 
-            {/* ---------- STEP 2: Pilih Kurir ---------- */}
             {currentStep === 2 && (
               <>
-                <div className="relative">
-                  <label className="block text-sm font-medium text-foreground">
-                    Cari Kecamatan / Kota Tujuan
-                    <input
-                      value={query}
-                      onChange={e => setQuery(e.target.value)}
-                      placeholder="Ketik minimal 3 huruf (contoh: Cilandak, Bandung)..."
-                      className="mt-2 w-full rounded-xl border border-input bg-background px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-                    />
-                  </label>
+                <div className="rounded-2xl border border-border bg-muted/40 p-5">
+                  <p className="text-sm font-medium text-foreground">
+                    <MapPin className="mr-2 inline h-4 w-4" />
+                    Area tujuan: <span className="font-semibold">{selectedAreaName}</span>
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Jumlah: {quantity} pcs × {beratPerUnit}g = {quantity * beratPerUnit}g
+                  </p>
+                </div>
 
-                  {searchLoading && (
-                    <p className="mt-2 text-xs text-muted-foreground">Mencari area...</p>
+                <div className="mt-6 space-y-4">
+                  <p className="text-sm font-medium text-foreground">Pilih Kurir</p>
+                  {courierLoading && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                      Memuat pilihan kurir...
+                    </div>
                   )}
-
-                  {results.length > 0 && (
-                    <ul className="absolute z-10 mt-1 w-full rounded-xl border border-border bg-card shadow-lg max-h-60 overflow-auto">
-                      {results.map(area => (
-                        <li key={area.id}>
-                          <button
-                            type="button"
-                            onClick={() => handleSelectArea(area)}
-                            className="w-full px-4 py-3 text-left text-sm hover:bg-muted"
-                          >
-                            <div className="flex items-center gap-2">
-                              <MapPin className="h-4 w-4 text-muted-foreground" />
-                              <span>{area.name}</span>
-                            </div>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
+                  {courierError && (
+                    <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4">
+                      <p className="text-sm text-destructive font-medium">{courierError}</p>
+                    </div>
                   )}
-
-                  {selectedAreaName && (
-                    <div className="mt-3 rounded-xl border border-primary/30 bg-primary/5 p-3">
-                      <p className="text-sm text-primary">
-                        <span className="font-medium">Area terpilih:</span> {selectedAreaName}
+                  {!courierLoading && !courierError && courierList.length === 0 && (
+                    <div className="rounded-xl border border-border bg-background p-4">
+                      <p className="text-sm text-muted-foreground">
+                        Maaf, saat ini tidak ada layanan JNE/J&T yang tersedia untuk area {selectedAreaName}. Silakan pilih area lain atau hubungi kami via WhatsApp.
                       </p>
                     </div>
                   )}
-                </div>
-
-                {selectedAreaId && (
-                  <div className="mt-6 space-y-4">
-                    <p className="text-sm font-medium text-foreground">Pilih Kurir</p>
-
-                    {courierLoading && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                        Memuat daftar kurir...
-                      </div>
-                    )}
-
-                    {courierError && (
-                      <p className="text-sm text-destructive">{courierError}</p>
-                    )}
-
-                    {!courierLoading && !courierError && courierList.length === 0 && (
-                      <p className="text-sm text-muted-foreground">
-                        Tidak ada kurir JNE/J&T yang tersedia untuk area ini.
-                      </p>
-                    )}
-
-                    {!courierLoading && courierList.length > 0 && (
-                      <div className="space-y-2" role="radiogroup" aria-label="Pilihan kurir">
-                        {courierList.map((courier, index) => (
-                          <label
-                            key={`${courier.courier_name}-${courier.service}-${index}`}
-                            className={getCourierRadioClass(courier, selectedCourier)}
-                          >
-                            <input
-                              type="radio"
-                              name="kurir"
-                              value={`${courier.courier_name}|${courier.service}`}
-                              checked={
-                                selectedCourier?.courier_name === courier.courier_name &&
-                                selectedCourier?.service === courier.service
-                              }
-                              onChange={() => setSelectedCourier(courier)}
-                              className="h-4 w-4 accent-primary"
-                            />
-                            <div className="flex-1 flex flex-col">
-                              <span className="font-medium text-foreground">
-                                {courier.courier_name.toUpperCase()} — {courier.service}
-                              </span>
-                              <span className="text-xs text-muted-foreground">
-                                Estimasi: {courier.estimasi}
-                              </span>
-                            </div>
-                            <span className="font-semibold text-primary whitespace-nowrap">
-                              {formatRupiah(courier.harga)}
+                  {!courierLoading && courierList.length > 0 && (
+                    <div className="space-y-2" role="radiogroup" aria-label="Pilihan kurir">
+                      {courierList.map((courier, index) => (
+                        <label
+                          key={`${courier.courier_name}-${courier.service}-${index}`}
+                          className={getCourierRadioClass(courier, selectedCourier)}
+                        >
+                          <input
+                            type="radio"
+                            name="kurir"
+                            value={`${courier.courier_name}|${courier.service}`}
+                            checked={
+                              selectedCourier?.courier_name === courier.courier_name &&
+                              selectedCourier?.service === courier.service
+                            }
+                            onChange={() => setSelectedCourier(courier)}
+                            className="h-4 w-4 accent-primary"
+                          />
+                          <div className="flex-1 flex flex-col">
+                            <span className="font-medium text-foreground">
+                              {courier.courier_name.toUpperCase()} — {courier.service}
                             </span>
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+                            <span className="text-xs text-muted-foreground">
+                              Estimasi: {courier.estimasi}
+                            </span>
+                          </div>
+                          <span className="font-semibold text-primary whitespace-nowrap">
+                            {formatRupiah(courier.harga)}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
                 <div className="mt-6 flex justify-between">
                   <Button
@@ -451,7 +449,6 @@ export function TransaksiChat({
               </>
             )}
 
-            {/* ---------- STEP 3: Ringkasan & Bayar ---------- */}
             {currentStep === 3 && (
               <>
                 <div className="space-y-4 rounded-2xl border border-border bg-muted/40 p-5">
@@ -509,7 +506,6 @@ export function TransaksiChat({
           </form>
         </div>
 
-        {/* WhatsApp fallback (always visible at bottom) */}
         <div className="mt-6 rounded-2xl bg-muted/50 p-6 text-center sm:p-8">
           <p className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-primary">
             Butuh bantuan?

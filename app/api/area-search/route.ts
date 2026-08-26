@@ -40,10 +40,23 @@ export async function GET(request: Request) {
     }
 
     const data = await biteshipResponse.json();
-    return new NextResponse(JSON.stringify(data), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+
+    if (data.success) {
+      const areas = data.areas ?? [];
+      return new NextResponse(
+        JSON.stringify({ success: true, areas }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    return new NextResponse(
+      JSON.stringify({
+        success: false,
+        message: 'Failed to fetch area data from Biteship',
+        details: (data as any).message ?? 'Unknown error',
+      }),
+      { status: biteshipResponse.status, headers: { 'Content-Type': 'application/json' } }
+    );
   } catch (error) {
     console.error('Error in area-search proxy:', error);
     return new NextResponse(
