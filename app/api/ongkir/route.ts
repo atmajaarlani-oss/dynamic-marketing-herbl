@@ -20,7 +20,7 @@ interface OngkirResult {
   estimasi: string;
 }
 
-const ALLOWED_COURIER_CODES = ['jne', 'jnt', 'sicepat'];
+const ALLOWED_COURIER_CODES = ['jne', 'jnt'];
 
 export async function POST(request: Request) {
   try {
@@ -57,17 +57,26 @@ export async function POST(request: Request) {
       );
     }
 
-    const url = new URL('https://biteship.com/v1/rates');
-    url.searchParams.set('origin_area_id', originAreaId);
-    url.searchParams.set('destination_area_id', destination_area_id);
-    url.searchParams.set('weight', String(total_weight));
-
-    const biteshipRes = await fetch(url.toString(), {
-      method: 'GET',
+    const biteshipRes = await fetch('https://api.biteship.com/v1/rates/couriers', {
+      method: 'POST',
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: apiKey,
+        'Content-Type': 'application/json',
         Accept: 'application/json',
       },
+      body: JSON.stringify({
+        origin_area_id: originAreaId,
+        destination_area_id,
+        couriers: 'jne,jnt',
+        items: [
+          {
+            name: 'Produk',
+            value: 0,
+            weight: total_weight,
+            quantity: 1,
+          },
+        ],
+      }),
     });
 
     if (!biteshipRes.ok) {
