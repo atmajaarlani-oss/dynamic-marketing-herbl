@@ -214,6 +214,12 @@ export function TransaksiChat({
     { step: 3, label: 'Bayar', icon: <CreditCard className="h-4 w-4" /> },
   ]
 
+  // Helper to determine courier radio class
+  const getCourierRadioClass = (courier: CourierOption, selected: CourierOption | null) => {
+    const isSelected = selected?.courier_name === courier.courier_name && selected?.service === courier.service
+    return `flex items-center gap-3 rounded-xl border-2 p-3 text-sm cursor-pointer transition ${isSelected ? 'border-primary bg-primary/5' : 'border-border bg-background hover:bg-muted/50'}`
+  }
+
   return (
     <section className="bg-background px-4 py-16 sm:px-6 lg:px-8" aria-labelledby="transaksi-title">
       <div className="mx-auto max-w-2xl">
@@ -223,13 +229,12 @@ export function TransaksiChat({
             {steps.map(({ step, label, icon }, index) => (
               <li key={step} className="flex items-center">
                 <div
-                  className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold transition-all ${
-                    step < currentStep
-                      ? 'bg-primary text-primary-foreground'
-                      : step === currentStep
-                      ? 'bg-primary/20 text-primary border-2 border-primary'
-                      : 'bg-muted text-muted-foreground'
-                  }`}
+                  className={step < currentStep
+                    ? 'flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold bg-primary text-primary-foreground'
+                    : step === currentStep
+                    ? 'flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold bg-primary/20 text-primary border-2 border-primary'
+                    : 'flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold bg-muted text-muted-foreground'
+                  }
                 >
                   {step < currentStep ? <CheckCircle className="h-5 w-5" /> : icon}
                 </div>
@@ -237,9 +242,7 @@ export function TransaksiChat({
                   {label}
                 </span>
                 {index < steps.length - 1 && (
-                  <div
-                    className={`hidden h-0.5 w-16 mx-2 sm:block ${step < currentStep ? 'bg-primary' : 'bg-muted'}`}
-                  />
+                  <div className={step < currentStep ? 'hidden h-0.5 w-16 mx-2 sm:block bg-primary' : 'hidden h-0.5 w-16 mx-2 sm:block bg-muted'}/>
                 )}
               </li>
             ))}
@@ -357,7 +360,7 @@ export function TransaksiChat({
                             </div>
                           </button>
                         </li>
-                      )}
+                      ))}
                     </ul>
                   )}
 
@@ -396,12 +399,7 @@ export function TransaksiChat({
                         {courierList.map((courier, index) => (
                           <label
                             key={`${courier.courier_name}-${courier.service}-${index}`}
-                            className={`flex items-center gap-3 rounded-xl border-2 p-3 text-sm cursor-pointer transition ${
-                              selectedCourier?.courier_name === courier.courier_name &&
-                              selectedCourier?.service === courier.service
-                                ? 'border-primary bg-primary/5'
-                                : 'border-border bg-background hover:bg-muted/50'
-                            }`}
+                            className={getCourierRadioClass(courier, selectedCourier)}
                           >
                             <input
                               type="radio"
