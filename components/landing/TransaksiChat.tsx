@@ -59,7 +59,6 @@ export function TransaksiChat({
   const isStep2Valid = selectedCourier !== null
 
   useEffect(() => {
-    // Heuristik: ambil kata terakhir jika lebih dari 2 kata dipisah spasi
     const words = query.trim().split(/\s+/)
     const searchQuery = words.length > 2 ? words[words.length - 1] : query.trim()
 
