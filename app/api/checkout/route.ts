@@ -133,13 +133,7 @@ export async function POST(request: NextRequest) {
     }
 
     const items = Array.isArray(body?.items) ? body.items : []
-    // Validate that items exist and each has a product_id
-    if (!items || items.length === 0) {
-      return NextResponse.json(
-        { error: 'produk_id wajib' },
-        { status: 400 },
-      )
-    }
+    // Validate that each item has a product_id (remove empty‑cart check)
     for (const item of items) {
       const productId = asString(item?.product_id)
       if (!productId) {
