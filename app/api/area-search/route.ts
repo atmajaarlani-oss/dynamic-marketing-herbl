@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 function buildBiteshipUrl(input: string, countries: string, type: string) {
-  const baseUrl = 'https://biteship.com/v1/maps/areas';
+  const baseUrl = 'https://api.biteship.com/v1/maps/areas';
   const params = new URLSearchParams({
     countries,
     input,
@@ -22,7 +22,7 @@ export async function GET(request: Request) {
     const biteshipResponse = await fetch(targetUrl, {
       method: 'GET',
       headers: {
-        Authorization: `Bearer ${process.env.BITESHIP_API_KEY}`,
+        Authorization: process.env.BITESHIP_API_KEY,
         Accept: 'application/json',
       },
     });
