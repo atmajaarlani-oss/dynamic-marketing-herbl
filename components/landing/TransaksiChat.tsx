@@ -31,6 +31,7 @@ export function TransaksiChat({
   beratPerUnit = 1000,
 }: TransaksiChatProps) {
   const [currentStep, setCurrentStep] = useState<Step>(1)
+  const formCardRef = useRef<HTMLDivElement>(null)
 
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
@@ -192,7 +193,7 @@ export function TransaksiChat({
 
   const goToStep = (step: Step) => {
     setCurrentStep(step)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    formCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
   const handleNext = () => {
@@ -249,7 +250,10 @@ export function TransaksiChat({
           </ol>
         </div>
 
-        <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
+        <div
+          ref={formCardRef}
+          className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8"
+        >
           <header className="mb-6">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
               Langkah {currentStep} dari 3
