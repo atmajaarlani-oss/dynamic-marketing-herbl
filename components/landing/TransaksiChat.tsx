@@ -213,10 +213,9 @@ export function TransaksiChat({
     e.preventDefault();
     setLoading(true);
 
-    // Ambil data dari state yang sudah ada (name, phone, address, selectedCourier, dll)
     const payload = {
-      produk_id: productId,       // pastikan ada prop productId (atau ambil dari props)
-      jumlah: 1,                  // bisa disesuaikan jika ada input jumlah
+      produk_id: productId,
+      jumlah: 1,
       nama_pembeli: name,
       no_hp: phone,
       alamat: address,
@@ -234,12 +233,10 @@ export function TransaksiChat({
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Gagal checkout');
 
-      // Pastikan Snap sudah dimuat
       if (window.snap && data.snap_token) {
         window.snap.pay(data.snap_token, {
           onSuccess: function(result) {
             alert('Pembayaran!');
-            // Bisa redirect atau reset form
           },
           onPending: function(result) {
             alert('Pembayaran pending');
@@ -572,10 +569,10 @@ export function TransaksiChat({
             Butuh bantuan?
           </p>
           <h3 className="text-xl font-semibold text-foreground">
-            Cerita langsung dengan kami
+            Chat langsung sama kami
           </h3>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Tanyakan cara pakai, pilihan produk, atau hal lain sebelum memesan.
+            Tanya cara pakai, mau produk apa, atau hal lain sebelum pesen — kita siap bantu.
           </p>
           <a
             href={`https://wa.me/${whatsappNumber}`}
@@ -583,7 +580,7 @@ export function TransaksiChat({
             rel="noreferrer"
             className="mt-6 inline-flex items-center justify-center rounded-xl border-2 border-primary px-5 py-3 font-semibold text-primary transition hover:bg-primary hover:text-primary-foreground"
           >
-            <span className="underline">Pesan via WhatsApp</span>
+            <span className="underline">Chat WhatsApp</span>
           </a>
         </div>
       </div>
