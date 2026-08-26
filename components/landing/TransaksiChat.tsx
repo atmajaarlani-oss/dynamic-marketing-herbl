@@ -59,7 +59,11 @@ export function TransaksiChat({
   const isStep2Valid = selectedCourier !== null
 
   useEffect(() => {
-    if (!query.trim() || query.trim().length < 3) {
+    // Heuristik: ambil kata terakhir jika lebih dari 2 kata dipisah spasi
+    const words = query.trim().split(/\s+/)
+    const searchQuery = words.length > 2 ? words[words.length - 1] : query.trim()
+
+    if (!searchQuery || searchQuery.length < 3) {
       setResults([])
       setSearchLoading(false)
       return
@@ -75,7 +79,7 @@ export function TransaksiChat({
       const controller = new AbortController()
       searchControllerRef.current = controller
 
-      fetch(`/api/area-search?input=${encodeURIComponent(query.trim())}&countries=ID&type=single`, {
+      fetch(`/api/area-search?input=${encodeURIComponent(searchQuery)}&countries=ID&type=single`, {
         signal: controller.signal,
       })
         .then(res => res.json())
@@ -303,10 +307,13 @@ export function TransaksiChat({
                     <input
                       value={query}
                       onChange={e => setQuery(e.target.value)}
-                      placeholder="Ketik minimal 3 huruf (contoh: Cilandak, Bandung)..."
+                      placeholder="Contoh: Kutawaringin"
                       className="mt-2 w-full rounded-xl border border-input bg-background px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-ring"
                     />
                   </label>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Ketik nama kecamatan atau kelurahan saja, tanpa nama kabupaten/provinsi
+                  </p>
                   {searchLoading && (
                     <p className="mt-2 text-xs text-muted-foreground">Mencari area...</p>
                   )}
