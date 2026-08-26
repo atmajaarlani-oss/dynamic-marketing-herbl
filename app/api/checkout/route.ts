@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase'
 import midtransClient from 'midtrans-client'
 
 // -----------------------------------------------------------------------------
-// Initialise Midtrans Snap client.
+// Set up Midtrans Snap client.
 // NOTE: We rely on NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY
 // inside `createClient()`. The server key for Midtrans comes from
 // MIDTRANS_SERVER_KEY (and client key from MIDTRANS_CLIENT_KEY).
@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
       body = (await request.json()) as CheckoutRequestBody
     } catch {
       return NextResponse.json(
-        { error: 'Invalid JSON payload.' },
+        { error: 'Oops, bad JSON!' },
         { status: 400 },
       )
     }
@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
 
     if (items.length === 0) {
       return NextResponse.json(
-        { error: 'Cart is empty. Add at least one product before checkout.' },
+        { error: 'Looks like your cart is empty. Add at least one product before checkout.' },
         { status: 400 },
       )
     }
@@ -237,10 +237,6 @@ export async function POST(request: NextRequest) {
 
     // -------------------------------------------------------------------------
     // 4) Recalculate shipping fee for the selected courier (server-side)
-    //    We re-run the rate lookup against Biteship so the client cannot
-    //    tamper with the shipping cost. The selected courier is identified
-    //    by its (courier_code, courier_service_code) pair, and we re-derive
-    //    the price from the destination / weight information we have.
     // -------------------------------------------------------------------------
     if (!process.env.BITESHIP_API_KEY) {
       return NextResponse.json(
