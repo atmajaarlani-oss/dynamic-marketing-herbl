@@ -133,15 +133,25 @@ export async function POST(request: NextRequest) {
     }
 
     const items = Array.isArray(body?.items) ? body.items : []
-    const buyer = body?.buyer ?? ({} as CheckoutBuyer)
-    const courier = body?.courier
-
-    if (items.length === 0) {
+    // Validate that items exist and each has a product_id
+    if (!items || items.length === 0) {
       return NextResponse.json(
-        { error: 'Looks like your cart is empty. Add at least one product before checkout.' },
+        { error: 'produk_id wajib' },
         { status: 400 },
       )
     }
+    for (const item of items) {
+      const productId = asString(item?.product_id)
+      if (!productId) {
+        return NextResponse.json(
+          { error: 'produk_id wajib' },
+          { status: 400 },
+        )
+      }
+    }
+
+    const buyer = body?.buyer ?? ({} as CheckoutBuyer)
+    const courier = body?.courier
 
     if (!courier || !courier.courier_code || !courier.courier_service_code) {
       return NextResponse.json(
@@ -150,15 +160,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Normalise and validate each item
+    // Normalise each item so the rest of the handler can rely on numeric
+    // quantities and non-empty product ids.
     const normalisedItems = items.map((item, index) => {
       const productId = asString(item?.product_id)
       const quantity = Number(item?.quantity)
-      if (!productId) {
-        throw Object.assign(new Error(`Item at index ${index} is missing product_id.`), { status: 400 })
-      }
       if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isInteger(quantity)) {
-        throw Object.assign(new Error(`Item at index ${index} has an invalid quantity.`), { status: 400 })
+        throw Object.assign(
+          new Error(`Item at index ${index} has an invalid quantity.`),
+          { status: 400 },
+        )
       }
       return { product_id: productId, quantity }
     })
@@ -207,14 +218,12 @@ export async function POST(request: NextRequest) {
       subtotal: number
     }
 
-    const pricedItems: PricedItem[] = normalisedItems.map((item) => {
+    // Build priced items using the already‑validated `items` array
+    const pricedItems: PricedItem[] = normalisedItems.map(item => {
       const product = productById.get(item.product_id)!
-      // Use the discounted price when it exists and is > 0; otherwise the
-      // regular price. Never trust the client-supplied value.
-      const unitPrice =
-        product.harga_diskon && Number(product.harga_diskon) > 0
-          ? Number(product.harga_diskon)
-          : Number(product.harga_utama)
+      const unitPrice = product.harga_diskon && Number(product.harga_diskon) > 0
+        ? Number(product.harga_diskon)
+        : Number(product.harga_utama)
 
       if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
         throw Object.assign(
