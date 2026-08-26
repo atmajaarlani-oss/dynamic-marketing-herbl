@@ -9,7 +9,7 @@ type TransaksiChatProps = {
   whatsappNumber?: string
   hargaProduk?: number
   beratPerUnit?: number
-  productId?: string
+  productId: string
 }
 
 interface CourierOption {
@@ -259,8 +259,8 @@ export function TransaksiChat({
   }
 
   const steps: { step: Step; label: string; icon: React.ReactNode }[] = [
-    { step: 1, label: 'Data & Alamat', icon: <User className="h-4 w-4" /> },
-    { step: 2, label: 'Kurir', icon: <Truck className="h-4 w-4" /> },
+    { step: 1, label: 'Data Penerima & Alamat', icon: <User className="h-4 w-4" /> },
+    { step: 2, label: 'Pilih Kurir', icon: <Truck className="h-4 w-4" /> },
     { step: 3, label: 'Bayar', icon: <CreditCard className="h-4 w-4" /> },
   ]
 
