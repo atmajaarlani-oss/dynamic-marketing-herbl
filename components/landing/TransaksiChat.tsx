@@ -55,6 +55,21 @@ export function TransaksiChat({
   const searchControllerRef = useRef<AbortController | null>(null)
   const courierControllerRef = useRef<AbortController | null>(null)
 
+  useEffect(() => {
+    const existingScript = document.getElementById('midtrans-snap-script')
+    if (existingScript) return
+    const script = document.createElement('script')
+    script.id = 'midtrans-snap-script'
+    script.src = 'https://app.sandbox.midtrans.com/snap/snap.js'
+    script.setAttribute('data-client-key', process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY ?? '')
+    script.async = true
+    document.head.appendChild(script)
+    return () => {
+      const s = document.getElementById('midtrans-snap-script')
+      if (s) document.head.removeChild(s)
+    }
+  }, [])
+
   const subtotal = hargaProduk * quantity
   const ongkir = selectedCourier?.harga ?? 0
   const total = subtotal + ongkir
@@ -211,50 +226,53 @@ export function TransaksiChat({
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setLoading(true);
-
-    const payload = {
-      produk_id: productId,
-      jumlah: 1,
-      nama_pembeli: name,
-      no_hp: phone,
-      alamat: address,
-      kurir_kode: selectedCourier?.courier_name,
-      kurir_layanan: selectedCourier?.service,
-      ongkir: selectedCourier?.harga,
-    };
+    setLoading(true)
 
     try {
+      const payload = {
+        produk_id: productId,
+        jumlah: 1,
+        nama_pembeli: name,
+        no_hp: phone,
+        alamat: address,
+        kurir_kode: selectedCourier?.courier_name ?? '',
+        kurir_layanan: selectedCourier?.service ?? '',
+        ongkir: selectedCourier?.harga ?? 0,
+      }
+
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Gagal checkout');
+      })
 
-      if (window.snap && data.snap_token) {
-        window.snap.pay(data.snap_token, {
-          onSuccess: function(result) {
-            alert('Pembayaran!');
-          },
-          onPending: function(result) {
-            alert('Pembayaran pending');
-          },
-          onError: function(result) {
-            alert('Pembayaran gagal');
-          },
-          onClose: function() {
-            alert('Anda menutup popup tanpa menyelesaikan pembayaran');
-          }
-        });
-      } else {
-        alert('Snap tidak tersedia. Pastikan script Snap sudah dimuat.');
+      const data = await res.json()
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error ?? 'Checkout gagal. Coba lagi.')
       }
-    } catch (err: any) {
-      alert(err.message);
-    } finally {
-      setLoading(false);
+
+      ;(window as any).snap.pay(data.token, {
+        onSuccess: (_result: unknown) => {
+          setLoading(false)
+          alert('Pembayaran berhasil! Pesanan Anda sedang diproses.')
+        },
+        onPending: (_result: unknown) => {
+          setLoading(false)
+          alert('Menunggu pembayaran. Kami akan konfirmasi setelah pembayaran diterima.')
+        },
+        onError: (_result: unknown) => {
+          setLoading(false)
+          alert('Pembayaran gagal. Silakan coba lagi.')
+        },
+        onClose: () => {
+          setLoading(false)
+        },
+      })
+    } catch (err) {
+      setLoading(false)
+      const message = err instanceof Error ? err.message : 'Terjadi kesalahan.'
+      alert(message)
     }
   }
 
