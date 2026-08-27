@@ -4,6 +4,7 @@ interface BiteshipPricingItem {
   courier_code: string;
   courier_name: string;
   courier_service_name: string;
+  courier_service_code: string;
   price: number;
   duration: string;
 }
@@ -14,6 +15,8 @@ interface BiteshipRateResponse {
 }
 
 interface OngkirResult {
+  courier_code: string;
+  service_code: string;
   courier_name: string;
   service: string;
   harga: number;
@@ -103,6 +106,8 @@ export async function POST(request: Request) {
     const results: OngkirResult[] = data.pricing
       .filter((item) => ALLOWED_COURIER_CODES.includes(item.courier_code))
       .map((item) => ({
+        courier_code: item.courier_code,
+        service_code: item.courier_service_code,
         courier_name: item.courier_name,
         service: item.courier_service_name,
         harga: item.price,
