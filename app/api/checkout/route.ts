@@ -1,328 +1,116 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { randomUUID } from 'node:crypto'
 import { createClient } from '@/lib/supabase'
-import midtransClient from 'midtrans-client'
 
-// -----------------------------------------------------------------------------
-// Set up Midtrans Snap client.
-// -----------------------------------------------------------------------------
-const snap = new midtransClient.Snap({
-  isProduction: process.env.NODE_ENV === 'production',
-  serverKey: process.env.MIDTRANS_SERVER_KEY ?? '',
-  clientKey: process.env.MIDTRANS_CLIENT_KEY ?? '',
-})
+const midtransClient = require('midtrans-client')
 
-// -----------------------------------------------------------------------------
-// Types
-// -----------------------------------------------------------------------------
-interface CheckoutRequestBody {
-  produk_id: string
-  jumlah: number
-  nama_pembeli: string
-  no_hp: string
-  alamat: string
-  kurir_kode: string
-  kurir_layanan: string
-  ongkir: number
-}
-
-interface ProductRow {
-  id: string
-  nama_produk?: string
-  harga_utama: number
-  harga_diskon: number | null
-  berat?: number | null
-}
-
-interface PesananRow {
-  id: string
-  order_id: string
-  product_id: string
-  quantity: number
-  subtotal: number
-  shipping_fee: number
-  total_amount: number
-  status: string
-  buyer_name: string | null
-  buyer_email: string | null
-  buyer_phone: string | null
-  buyer_address: string | null
-  courier_code: string | null
-  courier_service_code: string | null
-  courier_name: string | null
-  courier_service_name: string | null
-}
-
-// -----------------------------------------------------------------------------
-// Helpers
-// -----------------------------------------------------------------------------
-function firstNonEmpty(...values: Array<string | null | undefined>): string {
-  for (const value of values) {
-    if (value && value.trim().length > 0) return value.trim()
-  }
-  return ''
-}
-
-function toRupiahAmount(value: number): number {
-  return Math.round(Number(value) || 0)
-}
-
-function asString(value: unknown): string {
-  if (value === null || value === undefined) return ''
-  if (typeof value === 'string') return value
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
-  return ''
-}
-
-// -----------------------------------------------------------------------------
-// POST /api/checkout
-// -----------------------------------------------------------------------------
 export async function POST(request: NextRequest) {
   try {
+    // 1. Check MIDTRANS_SERVER_KEY exists
     if (!process.env.MIDTRANS_SERVER_KEY) {
       return NextResponse.json(
-        { error: 'MIDTRANS_SERVER_KEY is not configured on the server.' },
-        { status: 500 },
+        { success: false, error: 'MIDTRANS_SERVER_KEY is not configured.' },
+        { status: 500 }
       )
     }
 
-    // -------------------------------------------------------------------------
-    // 1) Parse and validate the request body
-    // -------------------------------------------------------------------------
-    let body: CheckoutRequestBody
-    try {
-      body = (await request.json()) as CheckoutRequestBody
-    } catch {
-      return NextResponse.json(
-        { error: 'Oops, bad JSON!' },
-        { status: 400 },
-      )
-    }
+    // 2. Parse request body
+    const body = await request.json()
 
-    // Log payload for debugging
-    console.log('[checkout] Payload received:', body)
-
-    // Validate required fields
-    const requiredFields: { key: keyof CheckoutRequestBody; label: string }[] = [
-      { key: 'produk_id', label: 'produk_id' },
-      { key: 'jumlah', label: 'jumlah' },
-      { key: 'nama_pembeli', label: 'nama_pembeli' },
-      { key: 'no_hp', label: 'no_hp' },
-      { key: 'alamat', label: 'alamat' },
-      { key: 'kurir_kode', label: 'kurir_kode' },
-      { key: 'kurir_layanan', label: 'kurir_layanan' },
-      { key: 'ongkir', label: 'ongkir' },
-    ]
-
+    // 3. Validate required fields
+    const requiredFields = ['produk_id', 'nama_pembeli', 'no_hp', 'alamat', 'kurir_kode', 'ongkir']
     for (const field of requiredFields) {
-      const value = body[field.key]
+      const value = body[field]
       if (value === undefined || value === null || (typeof value === 'string' && value.trim() === '')) {
         return NextResponse.json(
-          { error: `${field.label} wajib diisi.` },
-          { status: 400 },
+          { success: false, error: `${field} wajib diisi.` },
+          { status: 400 }
         )
       }
     }
 
-    const produkId = asString(body.produk_id)
-    const jumlah = Number(body.jumlah)
-    if (!Number.isFinite(jumlah) || jumlah <= 0 || !Number.isInteger(jumlah)) {
-      return NextResponse.json(
-        { error: 'jumlah harus berupa bilangan bulat positif.' },
-        { status: 400 },
-      )
-    }
-
-    const ongkir = Number(body.ongkir)
-    if (!Number.isFinite(ongkir) || ongkir < 0) {
-      return NextResponse.json(
-        { error: 'ongkir harus berupa angka valid.' },
-        { status: 400 },
-      )
-    }
-
-    // -------------------------------------------------------------------------
-    // 2) Fetch product from the database
-    // -------------------------------------------------------------------------
+    // 4. Query Supabase table "produk"
     const supabase = await createClient()
-
-    const { data: productsData, error: productsError } = await supabase
+    const { data: produkData, error: produkError } = await supabase
       .from('produk')
-      .select('id, nama_produk, harga_utama, harga_diskon, berat')
-      .eq('id', produkId)
-
-    if (productsError) {
-      console.error('[checkout] failed to fetch product', productsError)
-      return NextResponse.json(
-        { error: 'Failed to load product information.' },
-        { status: 500 },
-      )
-    }
-
-    const product = (productsData ?? [])[0] as ProductRow | undefined
-    if (!product) {
-      return NextResponse.json(
-        { error: 'Produk tidak ditemukan.' },
-        { status: 404 },
-      )
-    }
-
-    // -------------------------------------------------------------------------
-    // 3) Calculate prices
-    // -------------------------------------------------------------------------
-    const unitPrice = product.harga_diskon && Number(product.harga_diskon) > 0
-      ? Number(product.harga_diskon)
-      : Number(product.harga_utama)
-
-    if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
-      return NextResponse.json(
-        { error: 'Harga produk tidak valid.' },
-        { status: 400 },
-      )
-    }
-
-    const subtotalProduk = unitPrice * jumlah
-    const totalBayar = toRupiahAmount(subtotalProduk + ongkir)
-
-    if (totalBayar <= 0) {
-      return NextResponse.json(
-        { error: 'Total amount tidak valid.' },
-        { status: 400 },
-      )
-    }
-
-    // -------------------------------------------------------------------------
-    // 4) Create order ID and insert into pesanan
-    // -------------------------------------------------------------------------
-    const orderId = `ORD-${Date.now()}-${randomUUID().slice(0, 8).toUpperCase()}`
-
-    const buyerName = firstNonEmpty(body.nama_pembeli)
-    const buyerPhone = firstNonEmpty(body.no_hp)
-    const buyerAddress = firstNonEmpty(body.alamat)
-
-    const pesananInsert = {
-      order_id: orderId,
-      product_id: produkId,
-      quantity: jumlah,
-      subtotal: toRupiahAmount(subtotalProduk),
-      shipping_fee: toRupiahAmount(ongkir),
-      total_amount: totalBayar,
-      status: 'pending',
-      buyer_name: buyerName || null,
-      buyer_email: null,
-      buyer_phone: buyerPhone || null,
-      buyer_address: buyerAddress || null,
-      courier_code: body.kurir_kode,
-      courier_service_code: body.kurir_layanan,
-      courier_name: body.kurir_kode,
-      courier_service_name: body.kurir_layanan,
-    }
-
-    const { data: insertedOrder, error: insertError } = await supabase
-      .from('pesanan')
-      .insert(pesananInsert)
-      .select('*')
+      .select('id, nama_produk, harga_utama, harga_diskon, berat_gram')
+      .eq('id', body.produk_id)
       .single()
 
-    if (insertError || !insertedOrder) {
-      console.error('[checkout] failed to insert pesanan', insertError)
+    if (produkError || !produkData) {
       return NextResponse.json(
-        { error: 'Failed to create order. Please try again.' },
-        { status: 500 },
+        { success: false, error: 'Produk tidak ditemukan.' },
+        { status: 404 }
       )
     }
 
-    const savedOrder = insertedOrder as PesananRow
+    const product = produkData
 
-    // -------------------------------------------------------------------------
-    // 5) Ask Midtrans Snap for a transaction token
-    // -------------------------------------------------------------------------
-    const midtransParameter = {
+    // 5. Calculate prices server-side
+    const harga_satuan = product.harga_diskon ?? product.harga_utama
+    const jumlah = Number(body.jumlah) || 0
+    const subtotal_produk = harga_satuan * jumlah
+    const ongkir_validated = Math.round(Number(body.ongkir) || 0)
+    const total_bayar = subtotal_produk + ongkir_validated
+
+    // 6. Generate unique order ID
+    const midtrans_order_id = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`
+
+    // 7. Insert into Supabase table "pesanan"
+    const insertPayload = {
+      produk_id: body.produk_id,
+      nama_produk: product.nama_produk,
+      jumlah: jumlah,
+      nama_pembeli: body.nama_pembeli,
+      no_hp: body.no_hp,
+      alamat: body.alamat,
+      harga_satuan: harga_satuan,
+      subtotal_produk: subtotal_produk,
+      ongkir: ongkir_validated,
+      total_bayar: total_bayar,
+      kurir_kode: body.kurir_kode,
+      kurir_layanan: body.kurir_layanan,
+      midtrans_order_id: midtrans_order_id,
+      status: 'pending',
+    }
+
+    const { error: insertError } = await supabase.from('pesanan').insert(insertPayload)
+
+    if (insertError) {
+      return NextResponse.json(
+        { success: false, error: insertError.message },
+        { status: 500 }
+      )
+    }
+
+    // 8. Create Midtrans Snap transaction
+    const snap = new midtransClient.Snap({
+      isProduction: false,
+      serverKey: process.env.MIDTRANS_SERVER_KEY,
+    })
+
+    const snapResponse = await snap.createTransaction({
       transaction_details: {
-        order_id: orderId,
-        gross_amount: totalBayar,
+        order_id: midtrans_order_id,
+        gross_amount: total_bayar,
       },
       customer_details: {
-        first_name: buyerName,
-        last_name: '',
-        email: '',
-        phone: buyerPhone,
-        billing_address: {
-          first_name: buyerName,
-          last_name: '',
-          email: '',
-          phone: buyerPhone,
-          address: buyerAddress,
-          city: '',
-          postal_code: '',
-          country_code: 'ID',
-        },
-        shipping_address: {
-          first_name: buyerName,
-          last_name: '',
-          email: '',
-          phone: buyerPhone,
-          address: buyerAddress,
-          city: '',
-          postal_code: '',
-          country_code: 'ID',
-        },
+        first_name: body.nama_pembeli,
+        phone: body.no_hp,
       },
-      item_details: [
-        {
-          id: product.id,
-          name: firstNonEmpty(product.nama_produk, product.id),
-          price: toRupiahAmount(unitPrice),
-          quantity: jumlah,
-        },
-      ],
-      shipping_cost: toRupiahAmount(ongkir),
-    }
+    })
 
-    let snapResponse: { token: string; redirect_url?: string }
-    try {
-      const tx = await snap.createTransaction(midtransParameter as never)
-      snapResponse = { token: tx.token, redirect_url: tx.redirect_url }
-    } catch (midtransError) {
-      console.error('[checkout] Midtrans createTransaction failed', midtransError)
-      await supabase
-        .from('pesanan')
-        .update({ status: 'failed' })
-        .eq('order_id', orderId)
+    const snapToken = snapResponse.token
 
-      return NextResponse.json(
-        { error: 'Failed to create Midtrans transaction. Please try again.' },
-        { status: 502 },
-      )
-    }
-
-    // Persist the Snap token / redirect URL
-    await supabase
-      .from('pesanan')
-      .update({
-        snap_token: snapResponse.token,
-        snap_redirect_url: snapResponse.redirect_url ?? null,
-      })
-      .eq('order_id', orderId)
-
-    // -------------------------------------------------------------------------
-    // 6) Respond with the Snap token and order id
-    // -------------------------------------------------------------------------
+    // 9. Return JSON
+    return NextResponse.json({
+      success: true,
+      token: snapToken,
+      order_id: midtrans_order_id,
+    })
+  } catch (error: any) {
     return NextResponse.json(
-      {
-        token: snapResponse.token,
-        order_id: orderId,
-        pesanan_id: savedOrder.id,
-        total_amount: totalBayar,
-        snap_redirect_url: snapResponse.redirect_url ?? null,
-      },
-      { status: 200 },
+      { success: false, error: error?.message || 'Unknown error' },
+      { status: 500 }
     )
-  } catch (error) {
-    const err = error as { status?: number; message?: string }
-    const status = typeof err?.status === 'number' ? err.status : 500
-    const message = err?.message ?? 'Unexpected error while processing checkout.'
-    console.error('[checkout] error', error)
-    return NextResponse.json({ error: message }, { status })
   }
 }
