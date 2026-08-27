@@ -235,8 +235,8 @@ export function TransaksiChat({
         nama_pembeli: name,
         no_hp: phone,
         alamat: address,
-        kurir_kode: selectedCourier?.courier_name ?? '',
-        kurir_layanan: selectedCourier?.service ?? '',
+        kurir_kode: selectedCourier?.courier_code ?? selectedCourier?.courier_name ?? '',
+        kurir_layanan: selectedCourier?.service_code ?? selectedCourier?.service ?? '',
         ongkir: selectedCourier?.harga ?? 0,
       }
 
