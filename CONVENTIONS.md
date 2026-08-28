@@ -3,7 +3,7 @@
 ## Stack & Alat
 - Next.js 16 (App Router), React 19, Tailwind CSS v4, TypeScript.
 - Package manager: `pnpm`.
-- Komponen UI: `@base-ui/react`, CVA, dan kode dari v0.dev.
+- Komponen UI: `@base-ui/react`, CVA.
 - Integrasi: Midtrans (Payment), Biteship (Logistik), Supabase (Auth/DB).
 
 ## Aturan Penulisan Kode
