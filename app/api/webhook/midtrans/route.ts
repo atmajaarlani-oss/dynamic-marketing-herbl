@@ -1,10 +1,19 @@
 import crypto from 'crypto'
-import { createClient } from '@/lib/supabase'
+import { createClient as createSupabaseAdmin } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
 export const runtime = 'nodejs'
 
+function getAdminClient() {
+  return createSupabaseAdmin(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
+
 export async function POST(request: Request) {
+  console.log('Hey! Received your webhook.')
+
   try {
     const body = await request.json()
 
@@ -49,7 +58,7 @@ export async function POST(request: Request) {
     }
 
     // STEP 3: Find the order in database
-    const supabase = await createClient()
+    const supabase = getAdminClient()
     const { data: pesanan, error: findError } = await supabase
       .from('pesanan')
       .select('id, status')
@@ -73,6 +82,7 @@ export async function POST(request: Request) {
       .update({
         status: newStatus,
         midtrans_transaction_id: body.transaction_id ?? null,
+        metode_pembayaran: body.payment_type ?? null,
         updated_at: new Date().toISOString(),
       })
       .eq('midtrans_order_id', order_id)
