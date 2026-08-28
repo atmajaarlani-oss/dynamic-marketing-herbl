@@ -13,6 +13,8 @@ type TransaksiChatProps = {
 }
 
 interface CourierOption {
+  courier_code: string
+  service_code: string
   courier_name: string
   service: string
   harga: number
@@ -231,12 +233,13 @@ export function TransaksiChat({
     try {
       const payload = {
         produk_id: productId,
-        jumlah: 1,
+        jumlah: quantity,
         nama_pembeli: name,
         no_hp: phone,
         alamat: address,
-        kurir_kode: selectedCourier?.courier_code ?? selectedCourier?.courier_name ?? '',
-        kurir_layanan: selectedCourier?.service_code ?? selectedCourier?.service ?? '',
+        destination_area_id: selectedAreaId ?? '',
+        kurir_kode: selectedCourier?.courier_code ?? '',
+        kurir_layanan: selectedCourier?.service_code ?? '',
         ongkir: selectedCourier?.harga ?? 0,
       }
 
