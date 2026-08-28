@@ -13,15 +13,28 @@ function formatRupiah(value: number | null) {
   }).format(value ?? 0)
 }
 
-export default async function HomePage() {
+const ITEMS_PER_PAGE = 8
+
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ halaman?: string }>
+}) {
+  const halaman = Math.max(1, Number((await searchParams).halaman) || 1)
+  const from = (halaman - 1) * ITEMS_PER_PAGE
+  const to = from + ITEMS_PER_PAGE - 1
   const supabase = await createClient()
-  const { data: produkList, error } = await supabase
+  const { data: produkList, count, error } = await supabase
     .from("produk")
-    .select("slug, nama_produk, harga_utama, harga_diskon, gambar, indikasi")
+    .select("slug, nama_produk, harga_utama, harga_diskon, gambar, indikasi", { count: "exact" })
     .eq("is_active", true)
     .order("created_at", { ascending: false })
+    .range(from, to)
 
   const products = produkList ?? []
+  const totalPages = Math.max(1, Math.ceil((count ?? 0) / ITEMS_PER_PAGE))
+  const hasPrevious = halaman > 1
+  const hasNext = halaman < totalPages
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -104,6 +117,38 @@ export default async function HomePage() {
               )
             })}
           </div>
+        )}
+
+        {!error && totalPages > 1 && (
+          <nav className="mt-10 flex items-center justify-between gap-4" aria-label="Navigasi halaman produk">
+            {hasPrevious ? (
+              <Link
+                href={`/home?halaman=${halaman - 1}`}
+                className="rounded-xl border border-border px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                Sebelumnya
+              </Link>
+            ) : (
+              <span aria-hidden="true" className="rounded-xl border border-border/50 px-4 py-2 text-sm text-muted-foreground/50">
+                Sebelumnya
+              </span>
+            )}
+            <p className="text-sm text-muted-foreground">
+              Halaman <span className="font-semibold text-foreground">{halaman}</span> dari {totalPages}
+            </p>
+            {hasNext ? (
+              <Link
+                href={`/home?halaman=${halaman + 1}`}
+                className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                Berikutnya
+              </Link>
+            ) : (
+              <span aria-hidden="true" className="rounded-xl bg-primary/40 px-4 py-2 text-sm font-semibold text-primary-foreground/70">
+                Berikutnya
+              </span>
+            )}
+          </nav>
         )}
       </section>
     </main>
