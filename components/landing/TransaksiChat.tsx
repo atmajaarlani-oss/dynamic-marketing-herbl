@@ -1,9 +1,22 @@
 'use client'
 
-import { FormEvent, useState, useEffect, useRef } from 'react'
+import { FormEvent, useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { formatRupiah } from '@/lib/harga'
 import { ChevronRight, ChevronLeft, Truck, CreditCard, User, MapPin, CheckCircle } from 'lucide-react'
+
+declare global {
+  interface Window {
+    snap?: {
+      pay: (token: string, callbacks: {
+        onSuccess: (result: unknown) => void
+        onPending: (result: unknown) => void
+        onError: (result: unknown) => void
+        onClose: () => void
+      }) => void
+    }
+  }
+}
 
 type TransaksiChatProps = {
   whatsappNumber?: string
@@ -102,7 +115,10 @@ export function TransaksiChat({
       fetch(`/api/area-search?input=${encodeURIComponent(searchQuery)}&countries=ID&type=single`, {
         signal: controller.signal,
       })
-        .then(res => res.json())
+        .then(res => {
+          if (!res.ok) throw new Error('Area search failed')
+          return res.json()
+        })
         .then(data => {
           if (data.success && Array.isArray(data.areas)) {
             setResults(
@@ -167,7 +183,10 @@ export function TransaksiChat({
       }),
       signal: controller.signal,
     })
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error('Ongkir fetch failed')
+        return res.json()
+      })
       .then(data => {
         if (data.success && Array.isArray(data.data)) {
           const filtered = data.data.filter(
@@ -255,7 +274,7 @@ export function TransaksiChat({
         throw new Error(data.error ?? 'Checkout gagal. Coba lagi.')
       }
 
-      ;(window as any).snap.pay(data.token, {
+      window.snap?.pay(data.token, {
         onSuccess: (_result: unknown) => {
           setLoading(false)
           alert('Pembayaran berhasil! Pesanan Anda sedang diproses.')
@@ -279,16 +298,16 @@ export function TransaksiChat({
     }
   }
 
-  const steps: { step: Step; label: string; icon: React.ReactNode }[] = [
-    { step: 1, label: 'Data Penerima & Alamat', icon: <User className="h-4 w-4" /> },
-    { step: 2, label: 'Pilih Kurir', icon: <Truck className="h-4 w-4" /> },
-    { step: 3, label: 'Bayar', icon: <CreditCard className="h-4 w-4" /> },
-  ]
+  const steps = useMemo(() => [
+    { step: 1 as Step, label: 'Data Penerima & Alamat', icon: <User className="h-4 w-4" /> },
+    { step: 2 as Step, label: 'Pilih Kurir', icon: <Truck className="h-4 w-4" /> },
+    { step: 3 as Step, label: 'Bayar', icon: <CreditCard className="h-4 w-4" /> },
+  ], [])
 
-  const getCourierRadioClass = (courier: CourierOption, selected: CourierOption | null) => {
+  const getCourierRadioClass = useCallback((courier: CourierOption, selected: CourierOption | null) => {
     const isSelected = selected?.courier_name === courier.courier_name && selected?.service === courier.service
     return `flex items-center gap-3 rounded-xl border-2 p-3 text-sm cursor-pointer transition ${isSelected ? 'border-primary bg-primary/5' : 'border-border bg-background hover:bg-muted/50'}`
-  }
+  }, [])
 
   return (
     <section className="bg-background px-4 py-16 sm:px-6 lg:px-8" aria-labelledby="transaksi-title">
@@ -475,7 +494,7 @@ export function TransaksiChat({
                     <div className="space-y-2" role="radiogroup" aria-label="Pilihan kurir">
                       {courierList.map((courier, index) => (
                         <label
-                          key={`${courier.courier_name}-${courier.service}-${index}`}
+                          key={`${courier.courier_code}-${courier.service_code}-${index}`}
                           className={getCourierRadioClass(courier, selectedCourier)}
                         >
                           <input
@@ -590,10 +609,10 @@ export function TransaksiChat({
             Butuh bantuan?
           </p>
           <h3 className="text-xl font-semibold text-foreground">
-            Chat langsung sama kami
+            Hai, chat aja sama kami
           </h3>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Tanya cara pakai, mau produk apa, atau hal lain sebelum pesen — kita siap bantu.
+            Mau tanya cara pakai, mau produk apa, atau hal lain sebelum pesen? Kita siap bantu, santai aja.
           </p>
           <a
             href={`https://wa.me/${whatsappNumber}`}
