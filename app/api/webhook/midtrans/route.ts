@@ -92,6 +92,62 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Database error' }, { status: 500 })
     }
 
+    // STEP 6: Create Biteship order after successful payment
+    if (newStatus === 'paid') {
+      try {
+        const { data: fullPesanan } = await supabase
+          .from('pesanan')
+          .select('nama_pembeli, no_hp, alamat, district_id, kurir_kode, kurir_layanan, nama_products, jumlah, total_bayar')
+          .eq('midtrans_order_id', order_id)
+          .single()
+
+        if (fullPesanan && fullPesanan.district_id) {
+          const biteshipRes = await fetch('https://api.biteship.com/v1/orders', {
+            method: 'POST',
+            headers: {
+              Authorization: process.env.BITESHIP_API_KEY!,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              origin_contact_name: 'Herbal Insani',
+              origin_contact_phone: '6287824611695',
+              origin_area_id: process.env.BITESHIP_ORIGIN_AREA_ID,
+              origin_address: 'alamat gudang/toko',
+              destination_contact_name: fullPesanan.nama_pembeli,
+              destination_contact_phone: fullPesanan.no_hp,
+              destination_address: fullPesanan.alamat,
+              destination_area_id: fullPesanan.district_id,
+              courier_company: fullPesanan.kurir_kode,
+              courier_type: fullPesanan.kurir_layanan,
+              delivery_type: 'now',
+              items: [
+                {
+                  name: fullPesanan.nama_products ?? 'Produk',
+                  value: Math.round(Number(fullPesanan.total_bayar) || 0),
+                  weight: 1000,
+                  quantity: fullPesanan.jumlah ?? 1,
+                  length: 15,
+                  width: 10,
+                  height: 10,
+                },
+              ],
+            }),
+          })
+          const biteshipData = await biteshipRes.json()
+          console.log('Biteship order response:', JSON.stringify(biteshipData, null, 2))
+
+          if (biteshipData.success) {
+            await supabase
+              .from('pesanan')
+              .update({ resi: biteshipData.courier?.waybill_id ?? null })
+              .eq('midtrans_order_id', order_id)
+          }
+        }
+      } catch (biteshipErr) {
+        console.error('Biteship order creation failed (non-fatal):', biteshipErr)
+      }
+    }
+
     console.log(`Webhook: order ${order_id} updated to ${newStatus}`)
     return NextResponse.json({ message: 'OK' }, { status: 200 })
 
