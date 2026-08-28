@@ -28,11 +28,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // 3.1. Validate jumlah field
+    const jumlah = Math.round(Number(body.jumlah))
+    if (isNaN(jumlah) || jumlah < 1) {
+      return NextResponse.json(
+        { success: false, error: 'Jumlah harus berupa bilangan bulat positif!' },
+        { status: 400 }
+      )
+    }
+
     // 4. Query Supabase table "produk"
     const supabase = await createClient()
     const { data: produkData, error: produkError } = await supabase
       .from('produk')
-      .select('id, nama_produk, harga_utama, harga_diskon, berat_gram')
+      .select('id, nama produk, harga_utama, harga_diskon, berat_gram')
       .eq('id', body.produk_id)
       .single()
 
@@ -47,29 +56,28 @@ export async function POST(request: NextRequest) {
 
     // 5. Calculate prices server-side
     const harga_satuan = product.harga_diskon ?? product.harga_utama
-    const jumlah = Math.max(1, Math.round(Number(body.jumlah) || 1))
-    const subtotal_produk = harga_satuan * jumlah
+    const subtotal produk = harga_satuan * jumlah
     const ongkir_validated = Math.round(Number(body.ongkir) || 0)
-    const total_bayar = subtotal_produk + ongkir_validated
+    const total_bayar = subtotal produk + ongkir_validated
 
     // 6. Generate unique order ID
-    const midtrans_order_id = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`
+    const midtrans_order_id = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`
 
     // 7. Insert into Supabase table "pesanan"
     const insertPayload = {
       produk_id: body.produk_id,
-      nama_produk: product.nama_produk,
+      nama produk: productnama produk,
       jumlah: jumlah,
-      nama_pembeli: body.nama_pembeli,
-      no_hp: body.no_hp,
-      alamat: body.alamat,
+      nama_pembeli: bodynama pembeli,
+      no_hp: bodyno_hp,
+      alamat: bodyalamat,
       harga_satuan: harga_satuan,
-      subtotal_produk: subtotal_produk,
+      subtotal produk: subtotal produk,
       ongkir: ongkir_validated,
       total_bayar: total_bayar,
-      kurir_kode: body.kurir_kode,
-      kurir_layanan: body.kurir_layanan,
-      district_id: body.destination_area_id ?? null,
+      kurir_kode: bodykurir_kode,
+      kurir_layanan: bodykurir_layanan,
+      district_id: bodydestination_area_id ?? null,
       midtrans_order_id: midtrans_order_id,
       status: 'pending',
     }
@@ -95,8 +103,8 @@ export async function POST(request: NextRequest) {
         gross_amount: total_bayar,
       },
       customer_details: {
-        first_name: body.nama_pembeli,
-        phone: body.no_hp,
+        first_name: bodynama pembeli,
+        phone: bodyno_hp,
       },
     })
 
