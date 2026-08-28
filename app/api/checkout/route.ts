@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient()
     const { data: produkData, error: produkError } = await supabase
       .from('produk')
-      .select('id, nama produk, harga_utama, harga_diskon, berat_gram')
+      .select('id, nama_produk, harga_utama, harga_diskon, berat_gram')
       .eq('id', body.produk_id)
       .single()
 
@@ -56,9 +56,9 @@ export async function POST(request: NextRequest) {
 
     // 5. Calculate prices server-side
     const harga_satuan = product.harga_diskon ?? product.harga_utama
-    const subtotal produk = harga_satuan * jumlah
+    const subtotal_produk = harga_satuan * jumlah
     const ongkir_validated = Math.round(Number(body.ongkir) || 0)
-    const total_bayar = subtotal produk + ongkir_validated
+    const total_bayar = subtotal_produk + ongkir_validated
 
     // 6. Generate unique order ID
     const midtrans_order_id = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`
@@ -66,18 +66,18 @@ export async function POST(request: NextRequest) {
     // 7. Insert into Supabase table "pesanan"
     const insertPayload = {
       produk_id: body.produk_id,
-      nama produk: productnama produk,
+      nama_produk: product.nama_produk,
       jumlah: jumlah,
-      nama_pembeli: bodynama pembeli,
-      no_hp: bodyno_hp,
-      alamat: bodyalamat,
+      nama_pembeli: body.nama_pembeli,
+      no_hp: body.no_hp,
+      alamat: body.alamat,
       harga_satuan: harga_satuan,
-      subtotal produk: subtotal produk,
+      subtotal_produk: subtotal_produk,
       ongkir: ongkir_validated,
       total_bayar: total_bayar,
-      kurir_kode: bodykurir_kode,
-      kurir_layanan: bodykurir_layanan,
-      district_id: bodydestination_area_id ?? null,
+      kurir_kode: body.kurir_kode,
+      kurir_layanan: body.kurir_layanan,
+      district_id: body.destination_area_id ?? null,
       midtrans_order_id: midtrans_order_id,
       status: 'pending',
     }
@@ -103,8 +103,8 @@ export async function POST(request: NextRequest) {
         gross_amount: total_bayar,
       },
       customer_details: {
-        first_name: bodynama pembeli,
-        phone: bodyno_hp,
+        first_name: body.nama_pembeli,
+        phone: body.no_hp,
       },
     })
 
