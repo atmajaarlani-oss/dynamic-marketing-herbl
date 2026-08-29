@@ -12,7 +12,7 @@ function getAdminClient() {
 }
 
 export async function POST(request: Request) {
-  console.log('Hey! Received your webhook.')
+  console.log('Yo! Got your webhook.')
 
   try {
     const body = await request.json()
