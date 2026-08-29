@@ -97,11 +97,13 @@ export async function POST(request: Request) {
       try {
         const { data: fullPesanan } = await supabase
           .from('pesanan')
-          .select('nama_pembeli, no_hp, alamat, district_id, kurir_kode, kurir_layanan, nama_products, jumlah, total_bayar')
+          .select('nama_pembeli, no_hp, alamat, district_id, kurir_kode, kurir_layanan, nama_produk, jumlah, total_bayar')
           .eq('midtrans_order_id', order_id)
           .single()
 
-        if (fullPesanan && fullPesanan.district_id) {
+        if (!process.env.BITESHIP_ORIGIN_AREA_ID) {
+          console.error('Biteship skipped: BITESHIP_ORIGIN_AREA_ID is not set in environment variables')
+        } else if (fullPesanan && fullPesanan.district_id) {
           const biteshipRes = await fetch('https://api.biteship.com/v1/orders', {
             method: 'POST',
             headers: {
@@ -122,7 +124,7 @@ export async function POST(request: Request) {
               delivery_type: 'now',
               items: [
                 {
-                  name: fullPesanan.nama_products ?? 'Produk',
+                  name: fullPesanan.nama_produk ?? 'Produk',
                   value: Math.round(Number(fullPesanan.total_bayar) || 0),
                   weight: 1000,
                   quantity: fullPesanan.jumlah ?? 1,
