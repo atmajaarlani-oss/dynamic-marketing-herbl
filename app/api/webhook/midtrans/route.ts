@@ -112,7 +112,7 @@ export async function POST(request: Request) {
               origin_contact_name: 'Herbal Insani',
               origin_contact_phone: '6287824611695',
               origin_area_id: process.env.BITESHIP_ORIGIN_AREA_ID,
-              origin_address: 'alamat gudang/toko',
+              origin_address: process.env.BITESHIP_ORIGIN_ADDRESS ?? 'Indonesia',
               destination_contact_name: fullPesanan.nama_pembeli,
               destination_contact_phone: fullPesanan.no_hp,
               destination_address: fullPesanan.alamat,
@@ -134,13 +134,24 @@ export async function POST(request: Request) {
             }),
           })
           const biteshipData = await biteshipRes.json()
-          console.log('Biteship order response:', JSON.stringify(biteshipData, null, 2))
+          console.log('Biteship order attempt for:', order_id)
+          console.log('Biteship request body preview:', {
+            origin_area_id: process.env.BITESHIP_ORIGIN_AREA_ID,
+            destination_area_id: fullPesanan?.district_id,
+            courier_company: fullPesanan?.kurir_kode,
+            courier_type: fullPesanan?.kurir_layanan,
+          })
+          console.log('Biteship response status:', biteshipRes.status)
+          console.log('Biteship response data:', JSON.stringify(biteshipData, null, 2))
 
-          if (biteshipData.success) {
+          if (biteshipData.success === true) {
             await supabase
               .from('pesanan')
               .update({ resi: biteshipData.courier?.waybill_id ?? null })
               .eq('midtrans_order_id', order_id)
+            console.log('Waybill saved:', biteshipData.courier?.waybill_id)
+          } else {
+            console.error('Biteship order failed:', biteshipData)
           }
         }
       } catch (biteshipErr) {
