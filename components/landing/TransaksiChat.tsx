@@ -49,6 +49,7 @@ export function TransaksiChat({
 }: TransaksiChatProps) {
   const [currentStep, setCurrentStep] = useState<Step>(1)
   const [loading, setLoading] = useState(false)
+  const [orderId, setOrderId] = useState<string | null>(null)
   const formCardRef = useRef<HTMLDivElement>(null)
 
   const [name, setName] = useState('')
@@ -274,14 +275,17 @@ export function TransaksiChat({
         throw new Error(data.error ?? 'Checkout gagal. Coba lagi.')
       }
 
-      window.snap?.pay(data.token, {
+      if (data.order_id) setOrderId(data.order_id)
+
+      const currentOrderId = data.order_id ?? '';
+      ;(window as any).snap.pay(data.token, {
         onSuccess: (_result: unknown) => {
           setLoading(false)
-          alert('Pembayaran berhasil! Pesanan Anda sedang diproses.')
+          window.location.href = `/pesanan/status?id=${currentOrderId}`
         },
         onPending: (_result: unknown) => {
           setLoading(false)
-          alert('Menunggu pembayaran. Kami akan konfirmasi setelah pembayaran diterima.')
+          window.location.href = `/pesanan/status?id=${currentOrderId}`
         },
         onError: (_result: unknown) => {
           setLoading(false)
@@ -289,6 +293,9 @@ export function TransaksiChat({
         },
         onClose: () => {
           setLoading(false)
+          if (currentOrderId) {
+            window.location.href = `/pesanan/status?id=${currentOrderId}`
+          }
         },
       })
     } catch (err) {
