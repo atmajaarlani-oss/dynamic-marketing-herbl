@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { CheckCircle, Clock, Package, Truck, Copy, MessageCircle } from "lucide-react";
@@ -17,13 +18,13 @@ const formatRupiah = (amount: number) =>
 const whatsappStoreLink = (resi: string) =>
   `https://wa.me/62812345678?text=Tracking%20resi%20${resi}`;
 
-export default function PesananStatusPage() {
+function StatusContent() {
   const [order, setOrder] = useState<OrderStatus | null>(null);
   const [status, setStatus] = useState<string>("pending");
   const [resi, setResi] = useState<string>("");
 
   const searchParams = useSearchParams();
-  const refCode = searchParams.get("ref");
+  const orderId = searchParams.get("id") || searchParams.get("order_id") || "";
 
   const fetchOrder = useCallback(async (id: string) => {
     const response = await fetch(`/api/orders/${id}`);
@@ -36,8 +37,8 @@ export default function PesananStatusPage() {
     let cancelled = false;
 
     const poll = async () => {
-      if (!resi) return;
-      await fetchOrder(resi);
+      if (!resi && !orderId) return;
+      await fetchOrder(resi || orderId);
 
       if (status === "paid" && resi) {
         cancelled = true;
@@ -54,7 +55,7 @@ export default function PesananStatusPage() {
     return () => {
       clearInterval(timer);
     };
-  }, [fetchOrder, status, resi]);
+  }, [fetchOrder, status, resi, orderId]);
 
   if (!order) {
     return (
@@ -108,5 +109,13 @@ export default function PesananStatusPage() {
         </a>
       </div>
     </div>
+  );
+}
+
+export default function PesananStatusPage() {
+  return (
+    <Suspense fallback={<div className="p-6">Loading...</div>}>
+      <StatusContent />
+    </Suspense>
   );
 }
