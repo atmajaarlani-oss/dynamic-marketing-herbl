@@ -97,7 +97,7 @@ export async function POST(request: Request) {
       try {
         const { data: fullPesanan } = await supabase
           .from('pesanan')
-          .select('nama_pembeli, no_hp, alamat, district_id, kurir_kode, kurir_layanan, nama_produk, jumlah, total_bayar, produk_id')
+          .select('nama_pembeli, no_hp, alamat, district_id, kurir_kode, kurir_layanan, nama_produk, jumlah, total_bayar, produk_id, resi')
           .eq('midtrans_order_id', order_id)
           .single()
 
