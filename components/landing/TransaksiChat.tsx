@@ -1,22 +1,9 @@
 'use client'
 
-import { FormEvent, useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { FormEvent, useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { formatRupiah } from '@/lib/harga'
 import { ChevronRight, ChevronLeft, Truck, CreditCard, User, MapPin, CheckCircle } from 'lucide-react'
-
-declare global {
-  interface Window {
-    snap?: {
-      pay: (token: string, callbacks: {
-        onSuccess: (result: unknown) => void
-        onPending: (result: unknown) => void
-        onError: (result: unknown) => void
-        onClose: () => void
-      }) => void
-    }
-  }
-}
 
 type TransaksiChatProps = {
   whatsappNumber?: string
@@ -26,8 +13,6 @@ type TransaksiChatProps = {
 }
 
 interface CourierOption {
-  courier_code: string
-  service_code: string
   courier_name: string
   service: string
   harga: number
@@ -49,7 +34,6 @@ export function TransaksiChat({
 }: TransaksiChatProps) {
   const [currentStep, setCurrentStep] = useState<Step>(1)
   const [loading, setLoading] = useState(false)
-  const [orderId, setOrderId] = useState<string | null>(null)
   const formCardRef = useRef<HTMLDivElement>(null)
 
   const [name, setName] = useState('')
@@ -116,10 +100,7 @@ export function TransaksiChat({
       fetch(`/api/area-search?input=${encodeURIComponent(searchQuery)}&countries=ID&type=single`, {
         signal: controller.signal,
       })
-        .then(res => {
-          if (!res.ok) throw new Error('Area search failed')
-          return res.json()
-        })
+        .then(res => res.json())
         .then(data => {
           if (data.success && Array.isArray(data.areas)) {
             setResults(
@@ -184,10 +165,7 @@ export function TransaksiChat({
       }),
       signal: controller.signal,
     })
-      .then(res => {
-        if (!res.ok) throw new Error('Ongkir fetch failed')
-        return res.json()
-      })
+      .then(res => res.json())
       .then(data => {
         if (data.success && Array.isArray(data.data)) {
           const filtered = data.data.filter(
@@ -253,13 +231,12 @@ export function TransaksiChat({
     try {
       const payload = {
         produk_id: productId,
-        jumlah: quantity,
+        jumlah: 1,
         nama_pembeli: name,
         no_hp: phone,
         alamat: address,
-        destination_area_id: selectedAreaId ?? '',
-        kurir_kode: selectedCourier?.courier_code ?? '',
-        kurir_layanan: selectedCourier?.service_code ?? '',
+        kurir_kode: selectedCourier?.courier_code ?? selectedCourier?.courier_name ?? '',
+        kurir_layanan: selectedCourier?.service_code ?? selectedCourier?.service ?? '',
         ongkir: selectedCourier?.harga ?? 0,
       }
 
@@ -275,17 +252,14 @@ export function TransaksiChat({
         throw new Error(data.error ?? 'Checkout gagal. Coba lagi.')
       }
 
-      if (data.order_id) setOrderId(data.order_id)
-
-      const currentOrderId = data.order_id ?? '';
       ;(window as any).snap.pay(data.token, {
         onSuccess: (_result: unknown) => {
           setLoading(false)
-          window.location.href = `/pesanan/status?id=${currentOrderId}`
+          alert('Pembayaran berhasil! Pesanan Anda sedang diproses.')
         },
         onPending: (_result: unknown) => {
           setLoading(false)
-          window.location.href = `/pesanan/status?id=${currentOrderId}`
+          alert('Menunggu pembayaran. Kami akan konfirmasi setelah pembayaran diterima.')
         },
         onError: (_result: unknown) => {
           setLoading(false)
@@ -293,9 +267,6 @@ export function TransaksiChat({
         },
         onClose: () => {
           setLoading(false)
-          if (currentOrderId) {
-            window.location.href = `/pesanan/status?id=${currentOrderId}`
-          }
         },
       })
     } catch (err) {
@@ -305,16 +276,16 @@ export function TransaksiChat({
     }
   }
 
-  const steps = useMemo(() => [
-    { step: 1 as Step, label: 'Data Penerima & Alamat', icon: <User className="h-4 w-4" /> },
-    { step: 2 as Step, label: 'Pilih Kurir', icon: <Truck className="h-4 w-4" /> },
-    { step: 3 as Step, label: 'Bayar', icon: <CreditCard className="h-4 w-4" /> },
-  ], [])
+  const steps: { step: Step; label: string; icon: React.ReactNode }[] = [
+    { step: 1, label: 'Data Penerima & Alamat', icon: <User className="h-4 w-4" /> },
+    { step: 2, label: 'Pilih Kurir', icon: <Truck className="h-4 w-4" /> },
+    { step: 3, label: 'Bayar', icon: <CreditCard className="h-4 w-4" /> },
+  ]
 
-  const getCourierRadioClass = useCallback((courier: CourierOption, selected: CourierOption | null) => {
+  const getCourierRadioClass = (courier: CourierOption, selected: CourierOption | null) => {
     const isSelected = selected?.courier_name === courier.courier_name && selected?.service === courier.service
     return `flex items-center gap-3 rounded-xl border-2 p-3 text-sm cursor-pointer transition ${isSelected ? 'border-primary bg-primary/5' : 'border-border bg-background hover:bg-muted/50'}`
-  }, [])
+  }
 
   return (
     <section className="bg-background px-4 py-16 sm:px-6 lg:px-8" aria-labelledby="transaksi-title">
@@ -501,7 +472,7 @@ export function TransaksiChat({
                     <div className="space-y-2" role="radiogroup" aria-label="Pilihan kurir">
                       {courierList.map((courier, index) => (
                         <label
-                          key={`${courier.courier_code}-${courier.service_code}-${index}`}
+                          key={`${courier.courier_name}-${courier.service}-${index}`}
                           className={getCourierRadioClass(courier, selectedCourier)}
                         >
                           <input
@@ -616,10 +587,10 @@ export function TransaksiChat({
             Butuh bantuan?
           </p>
           <h3 className="text-xl font-semibold text-foreground">
-            Hai, chat aja sama kami
+            Chat langsung sama kami
           </h3>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Mau tanya cara pakai, mau produk apa, atau hal lain sebelum pesen? Kita siap bantu, santai aja.
+            Tanya cara pakai, mau produk apa, atau hal lain sebelum pesen — kita siap bantu.
           </p>
           <a
             href={`https://wa.me/${whatsappNumber}`}
