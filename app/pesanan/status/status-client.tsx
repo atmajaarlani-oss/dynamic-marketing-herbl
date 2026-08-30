@@ -27,14 +27,17 @@ function formatRupiah(value: number | string) {
 }
 
 export default function StatusClient({ orderId }: { orderId: string | null }) {
+  console.log('[StatusClient] Component mounted, orderId prop:', orderId)
   const [order, setOrder] = useState<OrderStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
   const fetchStatus = useCallback(async () => {
+    console.log('[StatusClient] fetchStatus called, orderId:', orderId)
     if (!orderId) return
     try {
+      console.log('[StatusClient] About to fetch:', `/api/pesanan/status?id=${orderId}`)
       const res = await fetch(`/api/pesanan/status?id=${orderId}`)
       if (!res.ok) {
         setError(res.status === 404
@@ -53,6 +56,7 @@ export default function StatusClient({ orderId }: { orderId: string | null }) {
   }, [orderId])
 
   useEffect(() => {
+    console.log('[StatusClient] Main useEffect fired, orderId:', orderId)
     if (!orderId) {
       setError('Order ID tidak ditemukan di URL.')
       setLoading(false)
@@ -81,7 +85,7 @@ export default function StatusClient({ orderId }: { orderId: string | null }) {
   const whatsappLink = () => {
     const phone = '6287824611695'
     const msg = encodeURIComponent(
-      `Halo Herbal Insani 👋\n\nSaya ingin menanyakan pesanan:\n\n` +
+      `Hai, ada yang bisa dibantu nih 👋\n\nSaya ingin menanyakan pesanan:\n\n` +
       `Order ID: ${order?.order_id ?? orderId}\n` +
       `Produk: ${order?.namaProduk ?? '-'} ×${order?.jumlah ?? '-'}\n` +
       `Resi: ${order?.resi ?? 'sedang diproses'}\n\nTerima kasih.`
