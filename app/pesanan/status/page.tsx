@@ -1,13 +1,22 @@
+import { Suspense } from 'react'
 import StatusClient from './status-client'
 
-export default async function PesananStatusPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ id?: string; order_id?: string }>
-}) {
-  const params = await searchParams
-  // Handle both ?id=ORD-... (our snap redirect) and ?order_id=ORD-... (Midtrans redirect)
-  const orderId = params.id ?? params.order_id ?? null
+interface Props {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}
 
-  return <StatusClient orderId={orderId} />
+export default async function PesananStatusPage({ searchParams }: Props) {
+  const params = await searchParams
+  const rawId = params['id'] ?? params['order_id'] ?? null
+  const orderId = Array.isArray(rawId) ? rawId[0] : rawId
+
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-muted-foreground">Memuat...</p>
+      </div>
+    }>
+      <StatusClient orderId={orderId ?? ''} />
+    </Suspense>
+  )
 }
