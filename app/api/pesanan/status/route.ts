@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   const orderId = searchParams.get('id')
 
   if (!orderId || !orderId.startsWith('ORD-')) {
-    return NextResponse.json({ error: 'Invalid order ID' }, { status: 400 })
+    return NextResponse.json({ error: 'Hey, that order ID looks off!' }, { status: 400 })
   }
 
   try {
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
       .single()
 
     if (error || !data) {
-      return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Sorry, we couldn\'t find that order.' }, { status: 404 })
     }
 
     const kurirParts = [data.kurir_kode, data.kurir_layanan].filter(Boolean)
@@ -45,6 +45,6 @@ export async function GET(request: Request) {
       created_at: new Date(data.created_at).toISOString(),
     })
   } catch (err) {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ error: 'Oops, something went wrong on our end.' }, { status: 500 })
   }
 }
