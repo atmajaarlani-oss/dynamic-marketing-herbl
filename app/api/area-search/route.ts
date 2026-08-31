@@ -22,7 +22,7 @@ export async function GET(request: Request) {
     const biteshipResponse = await fetch(targetUrl, {
       method: 'GET',
       headers: {
-        Authorization: process.env.BITESHIP_API_KEY,
+        Authorization: process.env.BITESHIP_API_KEY ?? '',
         Accept: 'application/json',
       },
     });
