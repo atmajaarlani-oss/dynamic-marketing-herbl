@@ -12,7 +12,7 @@ __v0_jsx-dev-runtime.ts
 # Bolt:
 # Tidak ada file lokal Bolt yang di-ignore secara default.
 # Tambahkan .bolt/ hanya jika folder ini benar-benar dibuat:
-# .bolt/
+.bolt/
 
 # =========================================
 # Vercel local files
