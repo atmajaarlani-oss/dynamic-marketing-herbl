@@ -3,7 +3,7 @@
 import { FormEvent, useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { formatRupiah } from '@/lib/harga'
-import { ChevronRight, ChevronLeft, Truck, CreditCard, User, MapPin, CheckCircle } from 'lucide-react'
+import { ChevronRight, ChevronLeft, Truck, CreditCard, User, MapPin, CircleCheck as CheckCircle } from 'lucide-react'
 
 type TransaksiChatProps = {
   whatsappNumber?: string
