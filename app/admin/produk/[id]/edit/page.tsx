@@ -1,5 +1,3 @@
-export const runtime = "edge"
-
 import { notFound } from "next/navigation"
 import { createClient } from "@/lib/supabase"
 import ProdukForm, { type ProdukFormData } from "@/components/admin/ProdukForm"

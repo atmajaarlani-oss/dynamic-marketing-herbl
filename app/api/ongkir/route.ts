@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+export const runtime = "nodejs"
+
 interface BiteshipPricingItem {
   courier_code: string;
   courier_name: string;

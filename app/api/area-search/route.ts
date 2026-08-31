@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+export const runtime = "nodejs"
+
 function buildBiteshipUrl(input: string, countries: string, type: string) {
   const baseUrl = 'https://api.biteship.com/v1/maps/areas';
   const params = new URLSearchParams({
