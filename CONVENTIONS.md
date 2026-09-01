@@ -11,3 +11,6 @@
 2. **TypeScript:** Hindari penggunaan `any`. Pastikan *payload* yang dikirim ke Biteship/Midtrans sesuai dengan tipe data resminya.
 3. **Efisiensi:** Komponen klien (`'use client'`) hanya digunakan jika benar-benar butuh *state* (useState) atau *event listener* (onClick). Sisanya gunakan Server Components.
 4. **Tailwind v4:** Gunakan sintaks Tailwind CSS v4 standar tanpa konfigurasi tambahan yang tidak perlu jika sudah ditangani oleh postCSS.
+
+## target publish
+1.cloudflare
