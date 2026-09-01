@@ -9,19 +9,20 @@ __v0_jsx-dev-runtime.ts
 .snowflake/
 .v0-trash/
 
-# Bolt:
-# Tidak ada file lokal Bolt yang di-ignore secara default.
-# Tambahkan .bolt/ hanya jika folder ini benar-benar dibuat:
+# Bolt
+# Aktifkan hanya jika folder .bolt/ benar-benar digunakan
 .bolt/
 
 # =========================================
 # Vercel local files
 # =========================================
+
 .vercel/
 
 # =========================================
 # Environment variables and secrets
 # =========================================
+
 .env
 .env.*
 !.env.example
@@ -30,6 +31,7 @@ __v0_jsx-dev-runtime.ts
 # =========================================
 # Dependencies
 # =========================================
+
 node_modules/
 .pnp
 .pnp.js
@@ -38,14 +40,20 @@ node_modules/
 # =========================================
 # Next.js and build output
 # =========================================
+
 .next/
+next-env.d.ts
 out/
 dist/
 build/
 
+# Dokumentasi lokal
+/dokumentasic7/
+
 # =========================================
 # Testing and coverage
 # =========================================
+
 coverage/
 .nyc_output/
 *.lcov
@@ -53,6 +61,7 @@ coverage/
 # =========================================
 # Logs and diagnostics
 # =========================================
+
 *.log
 logs/
 npm-debug.log*
@@ -65,6 +74,7 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 # =========================================
 # Caches
 # =========================================
+
 .cache/
 .parcel-cache/
 .npm/
@@ -75,17 +85,21 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 # =========================================
 # Aider local files
 # =========================================
+
 .aider*
-.aider/
+.aider.tags.cache.v4/
 
 # =========================================
 # Context7 local files
 # =========================================
+
 .context7
+.context7/
 
 # =========================================
 # Geany local files
 # =========================================
+
 .geany/
 *.geany~
 .geany_metadata
@@ -93,6 +107,7 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 # =========================================
 # Linux and OS files
 # =========================================
+
 *~
 .fuse_hidden*
 .directory
@@ -101,8 +116,9 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 .DS_Store
 
 # =========================================
-# Miscellaneous generated files
+# Miscellaneous generated or sensitive files
 # =========================================
+
 *.pem
 *.tgz
 .node_repl_history

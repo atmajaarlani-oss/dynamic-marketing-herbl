@@ -1,5 +1,3 @@
-export const runtime = "edge"
-
 import { notFound } from "next/navigation"
 import Hero from "@/components/landing/Hero"
 import { ValidasiMasalah } from "@/components/landing/ValidasiMasalah"

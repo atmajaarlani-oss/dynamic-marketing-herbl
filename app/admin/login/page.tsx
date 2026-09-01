@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createBrowserSupabase } from "@/lib/supabase-browser"
 
-export const runtime = "edge"
+export const runtime = "nodejs"
 
 export default function AdminLoginPage() {
   const router = useRouter()
