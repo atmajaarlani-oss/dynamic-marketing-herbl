@@ -1,11 +1,21 @@
-import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
+import MetaPixel from '@/components/analytics/MetaPixel'
+import { PENGATURAN_GLOBAL } from '@/lib/pengaturan-global'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Hey!',
-  description: 'Created with v0',
-  generator: 'v0.app',
+  title: {
+    default: PENGATURAN_GLOBAL.metaTitleDefault,
+    template: `%s | Herbal Insani`,
+  },
+  description: PENGATURAN_GLOBAL.metaDescriptionDefault,
+  openGraph: {
+    title: PENGATURAN_GLOBAL.metaTitleDefault,
+    description: PENGATURAN_GLOBAL.metaDescriptionDefault,
+    type: 'website',
+    locale: 'id_ID',
+    siteName: 'Herbal Insani',
+  },
   icons: {
     icon: [
       {
@@ -39,7 +49,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="id">
       <body className="antialiased">
         {children}
         <script
@@ -47,7 +57,7 @@ export default function RootLayout({
           data-client-key={process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY}
           async
         />
-        {process.env.NODE_ENV === 'production' && <Analytics />}
+        <MetaPixel />
       </body>
     </html>
   )
