@@ -96,7 +96,7 @@ export function Hero({
 
         <div className="order-1 flex min-h-72 items-center justify-center rounded-2xl bg-[#e5eddc] p-5 sm:min-h-96 sm:p-8 lg:order-2">
           <div className="relative aspect-square w-full max-w-sm overflow-hidden rounded-2xl bg-[#fffaf1] shadow-[0_12px_28px_rgba(63,73,48,0.14)]">
-            <Image src={gambar} alt="Produk herbal" fill className="object-contain p-4" sizes="(max-width: 1024px) 80vw, 36vw" />
+            <Image src={gambar} alt={`${namaProduk} - Produk Herbal Herbal Insani`} fill className="object-contain p-4" sizes="(max-width: 1024px) 80vw, 36vw" />
           </div>
         </div>
       </div>

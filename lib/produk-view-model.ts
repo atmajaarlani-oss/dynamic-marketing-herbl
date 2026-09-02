@@ -39,7 +39,7 @@ import { hitungHargaPerHari } from "@/lib/harga"
 
 
 export function getProductImage(value: unknown): string {
-  return splitComma(value)[0] ?? "/placeholder.svg"
+  return splitComma(value)[0] ?? "/icon.svg"
 }
 
 export function formatStock(stok?: number | null): string {
