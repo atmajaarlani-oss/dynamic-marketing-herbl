@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase"
 import { formatRupiah } from "@/lib/harga"
 import { PENGATURAN_GLOBAL } from "@/lib/pengaturan-global"
 
-export const runtime = 'edge'
+export const runtime = 'nodejs'
 
 type PesananRow = {
   midtrans_order_id: string
