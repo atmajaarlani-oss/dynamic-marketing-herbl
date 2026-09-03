@@ -304,13 +304,13 @@ export function TransaksiChat({
 
       const currentOrderId = data.order_id ?? '';
       ;(window as any).snap.pay(data.token, {
-        onSuccess: (_result: unknown) => {
+        onSuccess: (result: unknown) => {
           setLoading(false)
-          window.location.href = `/pesanan/status?id=${currentOrderId}`
+          window.location.href = `/pesanan/${data.order_id}`
         },
-        onPending: (_result: unknown) => {
+        onPending: (result: unknown) => {
           setLoading(false)
-          window.location.href = `/pesanan/status?id=${currentOrderId}`
+          window.location.href = `/pesanan/${data.order_id}`
         },
         onError: (_result: unknown) => {
           setLoading(false)
