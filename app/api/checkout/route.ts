@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
 
     // 3. Validate required fields
-    const requiredFields = ['produk_id', 'nama_pembeli', 'no_hp', 'alamat', 'kurir_kode', 'ongkir', 'destination_area_id']
+    const requiredFields = ['produk_id', 'nama_pembeli', 'no_hp', 'alamat', 'kurir_kode', 'ongkir', 'destination_area_id', 'district_id']
     for (const field of requiredFields) {
       const value = body[field]
       if (value === undefined || value === null || (typeof value === 'string' && value.trim() === '')) {
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient()
     const { data: produkData, error: produkError } = await supabase
       .from('produk')
-      .select('id, nama_produk, harga_utama, harga_diskon, berat_gram')
+      .select('id, nama_produk, slug, harga_utama, harga_diskon, berat_gram')
       .eq('id', body.produk_id)
       .single()
 
@@ -67,6 +67,7 @@ export async function POST(request: NextRequest) {
     const insertPayload = {
       produk_id: body.produk_id,
       nama_produk: product.nama_produk,
+      produk_slug: product.slug,
       jumlah: jumlah,
       nama_pembeli: body.nama_pembeli,
       no_hp: body.no_hp,
@@ -77,7 +78,11 @@ export async function POST(request: NextRequest) {
       total_bayar: total_bayar,
       kurir_kode: body.kurir_kode,
       kurir_layanan: body.kurir_layanan,
-      district_id: body.destination_area_id ?? null,
+      district_id: body.district_id,
+      district_name: body.district_name ?? null,
+      city_name: body.city_name ?? null,
+      province_name: body.province_name ?? null,
+      postal_code: body.postal_code ?? null,
       midtrans_order_id: midtrans_order_id,
       status: 'pending',
     }
