@@ -135,19 +135,46 @@ export async function POST(request: Request) {
         }
 
         // STEP 8: Create Biteship order
+        const originContactName = process.env.BITESHIP_ORIGIN_CONTACT_NAME ?? ''
+        const originContactPhone = process.env.BITESHIP_ORIGIN_CONTACT_PHONE ?? ''
+        const originAreaId = process.env.BITESHIP_ORIGIN_AREA_ID ?? ''
+        const originAddress = process.env.BITESHIP_ORIGIN_ADDRESS ?? ''
+        const originLatitude = process.env.BITESHIP_ORIGIN_LATITUDE
+        const originLongitude = process.env.BITESHIP_ORIGIN_LONGITUDE
+        const apiKey = process.env.BITESHIP_API_KEY ?? ''
+
+        if (!apiKey || !originContactName || !originContactPhone || !originAreaId || !originAddress) {
+          console.error('Biteship skipped: missing required env vars', {
+            hasApiKey: !!apiKey,
+            hasOriginContactName: !!originContactName,
+            hasOriginContactPhone: !!originContactPhone,
+            hasOriginAreaId: !!originAreaId,
+            hasOriginAddress: !!originAddress,
+          })
+          return NextResponse.json({ message: 'OK' }, { status: 200 })
+        }
+
+        const originCoordinate: { latitude: number; longitude: number } | undefined =
+          originLatitude && originLongitude
+            ? {
+                latitude: Number(originLatitude),
+                longitude: Number(originLongitude),
+              }
+            : undefined
+
         const biteshipRes = await fetch('https://api.biteship.com/v1/orders', {
           method: 'POST',
           headers: {
-            Authorization: process.env.BITESHIP_API_KEY ?? '',
+            Authorization: apiKey,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            origin_contact_name:
-              process.env.BITESHIP_ORIGIN_CONTACT_NAME ?? 'HERBAL',
-            origin_contact_phone:
-              process.env.BITESHIP_ORIGIN_CONTACT_PHONE ?? '',
-            origin_area_id: process.env.BITESHIP_ORIGIN_AREA_ID,
-            origin_address: process.env.BITESHIP_ORIGIN_ADDRESS ?? '',
+            origin_contact_name: originContactName,
+            origin_contact_phone: originContactPhone,
+            origin_area_id: originAreaId,
+            origin_address: originAddress,
+            origin_collection_method: 'pickup',
+            ...(originCoordinate ? { origin_coordinate: originCoordinate } : {}),
             destination_contact_name: fullPesanan.nama_pembeli,
             destination_contact_phone: fullPesanan.no_hp,
             destination_address: fullPesanan.alamat,
