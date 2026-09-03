@@ -37,6 +37,10 @@ interface CourierOption {
 interface AreaSearchResult {
   id: string
   name: string
+  province_name?: string
+  city_name?: string
+  district_name?: string
+  postal_code?: number
 }
 
 type Step = 1 | 2 | 3
@@ -61,6 +65,10 @@ export function TransaksiChat({
   const [results, setResults] = useState<AreaSearchResult[]>([])
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null)
   const [selectedAreaName, setSelectedAreaName] = useState<string | null>(null)
+  const [selectedProvince, setSelectedProvince] = useState<string | null>(null)
+  const [selectedCity, setSelectedCity] = useState<string | null>(null)
+  const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null)
+  const [selectedPostalCode, setSelectedPostalCode] = useState<number | null>(null)
   const [searchLoading, setSearchLoading] = useState(false)
 
   const [selectedCourier, setSelectedCourier] = useState<CourierOption | null>(null)
@@ -123,16 +131,24 @@ export function TransaksiChat({
         .then(data => {
           if (data.success && Array.isArray(data.areas)) {
             setResults(
-              data.areas.map((item: { id?: string; name?: string }) => ({
+              data.areas.map((item: { id?: string; name?: string; administrative_division_level_1_name?: string; administrative_division_level_2_name?: string; administrative_division_level_3_name?: string; postal_code?: number }) => ({
                 id: String(item.id ?? ''),
                 name: String(item.name ?? ''),
+                province_name: item.administrative_division_level_1_name,
+                city_name: item.administrative_division_level_2_name,
+                district_name: item.administrative_division_level_3_name,
+                postal_code: item.postal_code,
               }))
             )
           } else if (Array.isArray(data)) {
             setResults(
-              data.map((item: { id?: string; name?: string }) => ({
+              data.map((item: { id?: string; name?: string; administrative_division_level_1_name?: string; administrative_division_level_2_name?: string; administrative_division_level_3_name?: string; postal_code?: number }) => ({
                 id: String(item.id ?? ''),
                 name: String(item.name ?? ''),
+                province_name: item.administrative_division_level_1_name,
+                city_name: item.administrative_division_level_2_name,
+                district_name: item.administrative_division_level_3_name,
+                postal_code: item.postal_code,
               }))
             )
           } else {
@@ -223,6 +239,10 @@ export function TransaksiChat({
   const handleSelectArea = (area: AreaSearchResult) => {
     setSelectedAreaId(area.id)
     setSelectedAreaName(area.name)
+    setSelectedProvince(area.province_name ?? null)
+    setSelectedCity(area.city_name ?? null)
+    setSelectedDistrict(area.district_name ?? null)
+    setSelectedPostalCode(area.postal_code ?? null)
     setQuery(area.name)
     setResults([])
   }
@@ -261,6 +281,11 @@ export function TransaksiChat({
         kurir_kode: selectedCourier?.courier_code ?? '',
         kurir_layanan: selectedCourier?.service_code ?? '',
         ongkir: selectedCourier?.harga ?? 0,
+        district_id: selectedAreaId,
+        district_name: selectedDistrict,
+        city_name: selectedCity,
+        province_name: selectedProvince,
+        postal_code: String(selectedPostalCode ?? ''),
       }
 
       const res = await fetch('/api/checkout', {
@@ -279,13 +304,13 @@ export function TransaksiChat({
 
       const currentOrderId = data.order_id ?? '';
       ;(window as any).snap.pay(data.token, {
-        onSuccess: (_result: unknown) => {
+        onSuccess: (result: unknown) => {
           setLoading(false)
-          window.location.href = `/pesanan/status?id=${currentOrderId}`
+          window.location.href = `/pesanan/${data.order_id}`
         },
-        onPending: (_result: unknown) => {
+        onPending: (result: unknown) => {
           setLoading(false)
-          window.location.href = `/pesanan/status?id=${currentOrderId}`
+          window.location.href = `/pesanan/${data.order_id}`
         },
         onError: (_result: unknown) => {
           setLoading(false)
@@ -435,7 +460,11 @@ export function TransaksiChat({
                   {selectedAreaName && (
                     <div className="mt-3 rounded-xl border border-primary/30 bg-primary/5 p-3">
                       <p className="text-sm text-primary">
-                        <span className="font-medium">Area terpilih:</span> {selectedAreaName}
+                        <span className="font-medium">Area terpilih:</span>{' '}
+                        {selectedDistrict ? `${selectedDistrict}, ` : ''}
+                        {selectedCity ? `${selectedCity}, ` : ''}
+                        {selectedProvince ?? ''}{' '}
+                        {selectedPostalCode ?? ''}
                       </p>
                     </div>
                   )}

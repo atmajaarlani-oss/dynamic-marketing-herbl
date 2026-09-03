@@ -95,46 +95,59 @@ export async function POST(request: Request) {
     // STEP 6: Create Biteship order after successful payment
     if (newStatus === 'paid') {
       try {
-        const { data: fullPesanan } = await supabase
+        // STEP 6: Fetch full order details for Biteship
+        const { data: fullPesanan, error: fullPesananError } = await supabase
           .from('pesanan')
-          .select('nama_pembeli, no_hp, alamat, district_id, kurir_kode, kurir_layanan, nama_produk, jumlah, total_bayar, produk_id, resi')
+          .select(
+            'id, nama_pembeli, no_hp, alamat, district_id, jumlah, kurir_kode, kurir_layanan, produk_id'
+          )
           .eq('midtrans_order_id', order_id)
+          .limit(1)
           .single()
 
-        if (!fullPesanan || !fullPesanan.district_id) {
-          console.error('Biteship skipped: missing fullPesanan or district_id')
+        if (fullPesananError || !fullPesanan) {
+          console.error('Biteship skipped: failed to fetch full pesanan', fullPesananError)
           return NextResponse.json({ message: 'OK' }, { status: 200 })
         }
 
-        if (fullPesanan?.resi) {
-          console.log('Biteship skipped: resi already exists', fullPesanan.resi)
+        if (!fullPesanan.district_id) {
+          console.warn(
+            `Biteship skipped: pesanan ${order_id} has no district_id`
+          )
           return NextResponse.json({ message: 'OK' }, { status: 200 })
         }
 
-        let beratPerItem = 500
-        if (fullPesanan?.produk_id) {
-          const { data: produkData } = await supabase
+        // STEP 7: Fetch product weight for Biteship items
+        let produk: { nama_produk: string | null; harga_diskon: number | null; berat_gram: number | null } | null = null
+        if (fullPesanan.produk_id) {
+          const { data: produkData, error: produkError } = await supabase
             .from('produk')
-            .select('berat_gram')
+            .select('nama_produk, harga_diskon, berat_gram')
             .eq('id', fullPesanan.produk_id)
+            .limit(1)
             .single()
-          if (produkData?.berat_gram) {
-            beratPerItem = produkData.berat_gram
+
+          if (produkError) {
+            console.error('Biteship: failed to fetch produk', produkError)
+          } else {
+            produk = produkData
           }
         }
-        console.log('Berat per item (gram):', beratPerItem)
 
+        // STEP 8: Create Biteship order
         const biteshipRes = await fetch('https://api.biteship.com/v1/orders', {
           method: 'POST',
           headers: {
-            Authorization: process.env.BITESHIP_API_KEY!,
+            Authorization: process.env.BITESHIP_API_KEY ?? '',
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            origin_contact_name: 'Herbal Insani',
-            origin_contact_phone: '6287824611695',
+            origin_contact_name:
+              process.env.BITESHIP_ORIGIN_CONTACT_NAME ?? 'HERBAL',
+            origin_contact_phone:
+              process.env.BITESHIP_ORIGIN_CONTACT_PHONE ?? '',
             origin_area_id: process.env.BITESHIP_ORIGIN_AREA_ID,
-            origin_address: process.env.BITESHIP_ORIGIN_ADDRESS ?? 'Indonesia',
+            origin_address: process.env.BITESHIP_ORIGIN_ADDRESS ?? '',
             destination_contact_name: fullPesanan.nama_pembeli,
             destination_contact_phone: fullPesanan.no_hp,
             destination_address: fullPesanan.alamat,
@@ -144,10 +157,10 @@ export async function POST(request: Request) {
             delivery_type: 'now',
             items: [
               {
-                name: fullPesanan.nama_produk ?? 'Produk',
-                value: Math.round(Number(fullPesanan.total_bayar) || 0),
-                weight: beratPerItem,
-                quantity: fullPesanan.jumlah ?? 1,
+                name: produk?.nama_produk ?? 'Produk',
+                value: Number(produk?.harga_diskon ?? 0),
+                weight: Number(produk?.berat_gram ?? 1000),
+                quantity: Number(fullPesanan.jumlah ?? 1),
                 length: 15,
                 width: 10,
                 height: 10,
@@ -155,35 +168,37 @@ export async function POST(request: Request) {
             ],
           }),
         })
+
         const biteshipData = await biteshipRes.json()
-        console.log('Biteship order attempt for:', order_id)
-        console.log('Biteship request body preview:', {
-          origin_area_id: process.env.BITESHIP_ORIGIN_AREA_ID,
-          destination_area_id: fullPesanan?.district_id,
-          courier_company: fullPesanan?.kurir_kode,
-          courier_type: fullPesanan?.kurir_layanan,
-        })
         console.log('Biteship response status:', biteshipRes.status)
         console.log('Biteship response data:', JSON.stringify(biteshipData, null, 2))
 
-        if (biteshipData.success === true) {
-          const trackingLink = (biteshipData.courier?.link ?? '')
-            .replace('?environment=development', '')
-
-          await supabase
+        // STEP 9: If Biteship order creation succeeds, update pesanan record
+        if (biteshipData?.success === true) {
+          const { error: resiUpdateError } = await supabase
             .from('pesanan')
             .update({
               resi: biteshipData.courier?.waybill_id ?? null,
-              catatan: trackingLink || null,
+              catatan: biteshipData.courier?.link ?? null,
             })
             .eq('midtrans_order_id', order_id)
 
-          console.log('Waybill saved:', biteshipData.courier?.waybill_id)
-          console.log('Tracking link saved:', trackingLink)
+          if (resiUpdateError) {
+            console.error(
+              'Biteship: failed to save waybill to pesanan (non-fatal)',
+              resiUpdateError
+            )
+          } else {
+            console.log(
+              'Biteship waybill saved:',
+              biteshipData.courier?.waybill_id
+            )
+          }
         } else {
-          console.error('Biteship order failed:', biteshipData)
+          console.error('Biteship order failed (non-fatal):', biteshipData)
         }
       } catch (biteshipErr) {
+        // Biteship failure must NOT cause webhook to return non-200
         console.error('Biteship order creation failed (non-fatal):', biteshipErr)
       }
     }
