@@ -143,7 +143,7 @@ export async function POST(request: Request) {
           },
           body: JSON.stringify({
             origin_contact_name:
-              process.env.BITESHIP_ORIGIN_CONTACT_NAME ?? 'Herbal Insani',
+              process.env.BITESHIP_ORIGIN_CONTACT_NAME ?? 'HERBAL',
             origin_contact_phone:
               process.env.BITESHIP_ORIGIN_CONTACT_PHONE ?? '',
             origin_area_id: process.env.BITESHIP_ORIGIN_AREA_ID,
