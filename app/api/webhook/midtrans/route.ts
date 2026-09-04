@@ -11,6 +11,23 @@ function getAdminClient() {
   )
 }
 
+function readRequiredEnv(name: string): string {
+  const value = process.env[name]
+  if (!value || value.trim() === '') {
+    throw new Error(`Missing required env var: ${name}`)
+  }
+  return value
+}
+
+function readNumberEnv(name: string): number {
+  const raw = readRequiredEnv(name)
+  const n = Number(raw)
+  if (!Number.isFinite(n)) {
+    throw new Error(`Env var ${name} must be a number, got: ${raw}`)
+  }
+  return n
+}
+
 export async function POST(request: Request) {
   console.log('Yo! Got your webhook.')
 
@@ -134,7 +151,28 @@ export async function POST(request: Request) {
           }
         }
 
-        // STEP 8: Create Biteship order
+        // STEP 8: Validate required Biteship origin env vars
+        // No more hardcoded "Herbal Insani" — fail loudly if env is missing.
+        let origin_contact_name: string
+        let origin_contact_phone: string
+        let origin_area_id: string
+        let origin_address: string
+        let origin_latitude: number
+        let origin_longitude: number
+        try {
+          origin_contact_name = readRequiredEnv('BITESHIP_ORIGIN_CONTACT_NAME')
+          origin_contact_phone = readRequiredEnv('BITESHIP_ORIGIN_CONTACT_PHONE')
+          origin_area_id = readRequiredEnv('BITESHIP_ORIGIN_AREA_ID')
+          origin_address = readRequiredEnv('BITESHIP_ORIGIN_ADDRESS')
+          origin_latitude = readNumberEnv('BITESHIP_ORIGIN_LATITUDE')
+          origin_longitude = readNumberEnv('BITESHIP_ORIGIN_LONGITUDE')
+        } catch (envErr) {
+          const msg = envErr instanceof Error ? envErr.message : 'Biteship env var missing'
+          console.error('Biteship skipped:', msg)
+          return NextResponse.json({ message: 'OK' }, { status: 200 })
+        }
+
+        // STEP 9: Create Biteship order
         const biteshipRes = await fetch('https://api.biteship.com/v1/orders', {
           method: 'POST',
           headers: {
@@ -142,12 +180,12 @@ export async function POST(request: Request) {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            origin_contact_name:
-              process.env.BITESHIP_ORIGIN_CONTACT_NAME ?? 'Herbal Insani',
-            origin_contact_phone:
-              process.env.BITESHIP_ORIGIN_CONTACT_PHONE ?? '',
-            origin_area_id: process.env.BITESHIP_ORIGIN_AREA_ID,
-            origin_address: process.env.BITESHIP_ORIGIN_ADDRESS ?? '',
+            origin_contact_name,
+            origin_contact_phone,
+            origin_area_id,
+            origin_address,
+            origin_latitude,
+            origin_longitude,
             destination_contact_name: fullPesanan.nama_pembeli,
             destination_contact_phone: fullPesanan.no_hp,
             destination_address: fullPesanan.alamat,
@@ -173,7 +211,7 @@ export async function POST(request: Request) {
         console.log('Biteship response status:', biteshipRes.status)
         console.log('Biteship response data:', JSON.stringify(biteshipData, null, 2))
 
-        // STEP 9: If Biteship order creation succeeds, update pesanan record
+        // STEP 10: If Biteship order creation succeeds, update pesanan record
         if (biteshipData?.success === true) {
           const { error: resiUpdateError } = await supabase
             .from('pesanan')
