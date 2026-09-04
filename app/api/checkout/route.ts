@@ -63,6 +63,55 @@ export async function POST(request: NextRequest) {
     // 6. Generate unique order ID
     const midtrans_order_id = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`
 
+    // 6.5. Enrich area details from Biteship if fields are missing
+    let district_name = body.district_name ?? null
+    let city_name = body.city_name ?? null
+    let province_name = body.province_name ?? null
+    let postal_code = body.postal_code ? String(body.postal_code) : null
+    let destination_area_details: Record<string, unknown> | null = null
+
+    const hasAreaGaps = !district_name || !city_name || !province_name || !postal_code
+
+    if (hasAreaGaps && body.district_id) {
+      try {
+        const areaRes = await fetch(
+          `https://api.biteship.com/v1/maps/areas?countries=ID&input=${encodeURIComponent(body.district_id)}&type=single`,
+          {
+            method: 'GET',
+            headers: {
+              Authorization: process.env.BITESHIP_API_KEY ?? '',
+              Accept: 'application/json',
+            },
+          }
+        )
+
+        if (areaRes.ok) {
+          const areaData = await areaRes.json()
+          if (areaData.success && Array.isArray(areaData.areas) && areaData.areas.length > 0) {
+            const area = areaData.areas[0]
+            destination_area_details = area
+            district_name = district_name || area.administrative_division_level_3_name || null
+            city_name = city_name || area.administrative_division_level_2_name || null
+            province_name = province_name || area.administrative_division_level_1_name || null
+            postal_code = postal_code || (area.postal_code ? String(area.postal_code) : null)
+          }
+        }
+      } catch {
+        // Non-fatal: continue with whatever we have
+      }
+    }
+
+    // 6.6. Last-resort fallback: parse from area_name string format "District, City, Province. PostalCode"
+    if ((!district_name || !city_name || !province_name || !postal_code) && body.area_name) {
+      const match = body.area_name.match(/^(.+?),\s*(.+?),\s*(.+?)\.\s*(\d+)$/)
+      if (match) {
+        district_name = district_name || match[1].trim()
+        city_name = city_name || match[2].trim()
+        province_name = province_name || match[3].trim()
+        postal_code = postal_code || match[4].trim()
+      }
+    }
+
     // 7. Insert into Supabase table "pesanan"
     const insertPayload = {
       produk_id: body.produk_id,
@@ -79,10 +128,11 @@ export async function POST(request: NextRequest) {
       kurir_kode: body.kurir_kode,
       kurir_layanan: body.kurir_layanan,
       district_id: body.district_id,
-      district_name: body.district_name ?? null,
-      city_name: body.city_name ?? null,
-      province_name: body.province_name ?? null,
-      postal_code: body.postal_code ?? null,
+      district_name: district_name,
+      city_name: city_name,
+      province_name: province_name,
+      postal_code: postal_code,
+      destination_area_details: destination_area_details,
       midtrans_order_id: midtrans_order_id,
       status: 'pending',
     }

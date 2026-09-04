@@ -69,6 +69,7 @@ export function TransaksiChat({
   const [selectedCity, setSelectedCity] = useState<string | null>(null)
   const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null)
   const [selectedPostalCode, setSelectedPostalCode] = useState<number | null>(null)
+  const [selectedAreaNameRaw, setSelectedAreaNameRaw] = useState<string | null>(null)
   const [searchLoading, setSearchLoading] = useState(false)
 
   const [selectedCourier, setSelectedCourier] = useState<CourierOption | null>(null)
@@ -239,12 +240,21 @@ export function TransaksiChat({
   const handleSelectArea = (area: AreaSearchResult) => {
     setSelectedAreaId(area.id)
     setSelectedAreaName(area.name)
+    setSelectedAreaNameRaw(area.name)
     setSelectedProvince(area.province_name ?? null)
     setSelectedCity(area.city_name ?? null)
     setSelectedDistrict(area.district_name ?? null)
     setSelectedPostalCode(area.postal_code ?? null)
     setQuery(area.name)
     setResults([])
+  }
+
+  function parseAreaNameFallback(name: string): { district: string | null; city: string | null; province: string | null; postal: number | null } {
+    const match = name.match(/^(.+?),\s*(.+?),\s*(.+?)\.\s*(\d+)$/)
+    if (match) {
+      return { district: match[1].trim(), city: match[2].trim(), province: match[3].trim(), postal: parseInt(match[4], 10) }
+    }
+    return { district: null, city: null, province: null, postal: null }
   }
 
   const handleQuantityChange = (value: number) => {
@@ -271,6 +281,11 @@ export function TransaksiChat({
     setLoading(true)
 
     try {
+      const finalDistrict = selectedDistrict ?? parseAreaNameFallback(selectedAreaNameRaw ?? '')?.district
+      const finalCity = selectedCity ?? parseAreaNameFallback(selectedAreaNameRaw ?? '')?.city
+      const finalProvince = selectedProvince ?? parseAreaNameFallback(selectedAreaNameRaw ?? '')?.province
+      const finalPostal = selectedPostalCode ?? parseAreaNameFallback(selectedAreaNameRaw ?? '')?.postal
+
       const payload = {
         produk_id: productId,
         jumlah: quantity,
@@ -282,10 +297,11 @@ export function TransaksiChat({
         kurir_layanan: selectedCourier?.service_code ?? '',
         ongkir: selectedCourier?.harga ?? 0,
         district_id: selectedAreaId,
-        district_name: selectedDistrict,
-        city_name: selectedCity,
-        province_name: selectedProvince,
-        postal_code: String(selectedPostalCode ?? ''),
+        district_name: finalDistrict,
+        city_name: finalCity,
+        province_name: finalProvince,
+        postal_code: finalPostal ? String(finalPostal) : '',
+        area_name: selectedAreaNameRaw ?? '',
       }
 
       const res = await fetch('/api/checkout', {
@@ -333,7 +349,7 @@ export function TransaksiChat({
   const steps = useMemo(() => [
     { step: 1 as Step, label: 'Data Penerima & Alamat', icon: <User className="h-4 w-4" /> },
     { step: 2 as Step, label: 'Pilih Kurir', icon: <Truck className="h-4 w-4" /> },
-    { step: 3 as Step, label: 'Bayar', icon: <CreditCard className="h-4 w-4" /> },
+    { step: 3 as Step, label: 'Pembayaran', icon: <CreditCard className="h-4 w-4" /> },
   ], [])
 
   const getCourierRadioClass = useCallback((courier: CourierOption, selected: CourierOption | null) => {
@@ -632,7 +648,7 @@ export function TransaksiChat({
                     disabled={loading}
                     className="rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
                   >
-                    {loading ? 'Memproses...' : 'Bayar Sekarang'}
+                    {loading ? 'Memproses...' : 'Pilih Pembayaran'}
                   </Button>
                 </div>
               </>
