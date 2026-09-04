@@ -172,6 +172,17 @@ export async function POST(request: Request) {
           return NextResponse.json({ message: 'OK' }, { status: 200 })
         }
 
+        // STEP 8.5: Debug log of Biteship origin config being used
+        // (Does NOT log BITESHIP_API_KEY)
+        console.log('Biteship origin config being used:', {
+          origin_contact_name,
+          origin_contact_phone,
+          origin_area_id,
+          origin_address,
+          origin_latitude,
+          origin_longitude,
+        })
+
         // STEP 9: Create Biteship order
         const biteshipRes = await fetch('https://api.biteship.com/v1/orders', {
           method: 'POST',

@@ -11,8 +11,21 @@ interface BiteshipPricingItem {
   duration: string;
 }
 
+interface BiteshipLocation {
+  location_id?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  postal_code?: number | string | null;
+  administrative_division_level_1_name?: string | null;
+  administrative_division_level_2_name?: string | null;
+  administrative_division_level_3_name?: string | null;
+  administrative_division_level_4_name?: string | null;
+}
+
 interface BiteshipRateResponse {
   success: boolean;
+  origin?: BiteshipLocation;
+  destination?: BiteshipLocation;
   pricing: BiteshipPricingItem[];
 }
 
@@ -116,7 +129,12 @@ export async function POST(request: Request) {
         estimasi: item.duration,
       }));
 
-    return NextResponse.json({ success: true, data: results });
+    return NextResponse.json({
+      success: true,
+      data: results,
+      origin: data.origin ?? null,
+      destination: data.destination ?? null,
+    });
   } catch (error) {
     console.error('Error in /api/ongkir:', error);
     return NextResponse.json(
