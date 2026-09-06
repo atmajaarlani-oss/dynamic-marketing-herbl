@@ -20,7 +20,7 @@ export default async function AdminProdukPage() {
         </div>
         <div className="flex gap-2">
           <Link href="/admin" className="rounded-xl border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition hover:bg-background">Kembali</Link>
-          <Link href="/admin/produk/baru" className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90">Tambah produk</Link>
+          <Link href="/admin/produk/tambah" className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90">Tambah produk</Link>
         </div>
       </header>
 

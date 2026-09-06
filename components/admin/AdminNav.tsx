@@ -8,7 +8,7 @@ import { createBrowserSupabase } from "@/lib/supabase-browser"
 const links = [
   { href: "/admin", label: "Beranda" },
   { href: "/admin/produk", label: "Produk" },
-  { href: "/admin/produk/baru", label: "Tambah produk" },
+  { href: "/admin/produk/tambah", label: "Tambah produk" },
 ]
 
 export default function AdminNav({ email }: { email: string | null }) {
@@ -20,7 +20,7 @@ export default function AdminNav({ email }: { email: string | null }) {
   async function handleSignOut() {
     setSigningOut(true)
     await supabase.auth.signOut()
-    router.replace("/admin/login")
+    router.replace("/admin-login")
     router.refresh()
   }
 
