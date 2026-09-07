@@ -404,7 +404,7 @@ export function TransaksiChat({
   }, [])
 
   return (
-    <section className="bg-background px-4 py-16 sm:px-6 lg:px-8" aria-labelledby="transaksi-title">
+    <section id="transaksi-form" className="bg-background px-4 py-16 sm:px-6 lg:px-8" aria-labelledby="transaksi-title">
       <div className="mx-auto max-w-2xl">
         <div className="mb-8 flex items-center justify-center">
           <ol className="flex items-center" role="list" aria-label="Langkah pemesanan">
