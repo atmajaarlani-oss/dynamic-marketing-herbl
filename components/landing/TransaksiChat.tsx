@@ -3,7 +3,7 @@
 import { FormEvent, useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { formatRupiah } from '@/lib/harga'
-import { ChevronRight, ChevronLeft, Truck, CreditCard, User, MapPin, CheckCircle } from 'lucide-react'
+import { ChevronRight, ChevronLeft, Truck, CreditCard, User, MapPin, CheckCircle, Minus, Plus } from 'lucide-react'
 
 declare global {
   interface Window {
@@ -44,6 +44,8 @@ interface AreaSearchResult {
 }
 
 type Step = 1 | 2 | 3
+
+const MAX_QUANTITY = 99
 
 export function TransaksiChat({
   whatsappNumber = '6281234567890',
@@ -296,7 +298,15 @@ export function TransaksiChat({
   }
 
   const handleQuantityChange = (value: number) => {
-    setQuantity(Math.max(1, value))
+    setQuantity(Math.min(MAX_QUANTITY, Math.max(1, value)))
+  }
+
+  const decrementQuantity = () => {
+    setQuantity(q => Math.max(1, q - 1))
+  }
+
+  const incrementQuantity = () => {
+    setQuantity(q => Math.min(MAX_QUANTITY, q + 1))
   }
 
   const goToStep = (step: Step) => {
@@ -535,16 +545,35 @@ export function TransaksiChat({
                   )}
                 </div>
 
-                <label className="block text-sm font-medium text-foreground">
-                  Jumlah Beli
-                  <input
-                    type="number"
-                    min={1}
-                    value={quantity}
-                    onChange={e => handleQuantityChange(Number(e.target.value))}
-                    className="mt-2 w-full rounded-xl border border-input bg-background px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </label>
+                <div>
+                  <span className="block text-sm font-medium text-foreground">Jumlah Beli</span>
+                  <div className="mt-2 inline-flex items-center gap-2 rounded-xl border border-input bg-background px-3 py-2 sm:gap-3">
+                    <button
+                      type="button"
+                      onClick={decrementQuantity}
+                      disabled={quantity <= 1}
+                      aria-label="Kurangi jumlah"
+                      className="flex h-11 w-11 items-center justify-center rounded-xl border border-input bg-background text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <Minus className="h-5 w-5" />
+                    </button>
+                    <div
+                      aria-live="polite"
+                      className="min-w-[3rem] text-center text-base font-semibold tabular-nums text-foreground"
+                    >
+                      {quantity}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={incrementQuantity}
+                      disabled={quantity >= MAX_QUANTITY}
+                      aria-label="Tambah jumlah"
+                      className="flex h-11 w-11 items-center justify-center rounded-xl border border-input bg-background text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <Plus className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
 
                 <div className="mt-6 flex justify-end">
                   <Button
