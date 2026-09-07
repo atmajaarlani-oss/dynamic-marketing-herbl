@@ -13,4 +13,4 @@
 4. **Tailwind v4:** Gunakan sintaks Tailwind CSS v4 standar tanpa konfigurasi tambahan yang tidak perlu jika sudah ditangani oleh postCSS.
 
 ## target publish
-1.cloudflare
+1. cloudflare
