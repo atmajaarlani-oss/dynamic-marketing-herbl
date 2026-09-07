@@ -207,6 +207,32 @@ export function TransaksiChat({
       })
       .then(data => {
         if (data.success && Array.isArray(data.data)) {
+          const destination = data.destination
+
+          if (destination) {
+            const province =
+              destination.administrative_division_level_1_name ?? null
+
+            const city =
+              destination.administrative_division_level_2_name ?? null
+
+            const district =
+              destination.administrative_division_level_3_name ?? null
+
+            const postalCode =
+              destination.postal_code !== null &&
+              destination.postal_code !== undefined
+                ? Number(destination.postal_code)
+                : null
+
+            if (province) setSelectedProvince(province)
+            if (city) setSelectedCity(city)
+            if (district) setSelectedDistrict(district)
+            if (postalCode !== null && Number.isFinite(postalCode)) {
+              setSelectedPostalCode(postalCode)
+            }
+          }
+
           const filtered = data.data.filter(
             (c: CourierOption) =>
               c.courier_name.toLowerCase().includes('jne') ||
@@ -236,6 +262,18 @@ export function TransaksiChat({
       courierControllerRef.current = null
     }
   }, [currentStep, selectedAreaId, quantity, beratPerUnit])
+
+  const clearSelectedArea = () => {
+    setSelectedAreaId(null)
+    setSelectedAreaName(null)
+    setSelectedProvince(null)
+    setSelectedCity(null)
+    setSelectedDistrict(null)
+    setSelectedPostalCode(null)
+    setSelectedCourier(null)
+    setCourierList([])
+    setCourierError(null)
+  }
 
   const handleSelectArea = (area: AreaSearchResult) => {
     setSelectedAreaId(area.id)
@@ -303,6 +341,14 @@ export function TransaksiChat({
         postal_code: finalPostal ? String(finalPostal) : '',
         area_name: selectedAreaNameRaw ?? '',
       }
+
+      console.log('Checkout payload wilayah:', {
+        destination_area_id: selectedAreaId,
+        district_name: selectedDistrict,
+        city_name: selectedCity,
+        province_name: selectedProvince,
+        postal_code: selectedPostalCode,
+      })
 
       const res = await fetch('/api/checkout', {
         method: 'POST',
@@ -444,7 +490,10 @@ export function TransaksiChat({
                     Cari Kecamatan / Kota Tujuan
                     <input
                       value={query}
-                      onChange={e => setQuery(e.target.value)}
+                      onChange={e => {
+                        clearSelectedArea()
+                        setQuery(e.target.value)
+                      }}
                       placeholder="Contoh: Kutawaringin"
                       className="mt-2 w-full rounded-xl border border-input bg-background px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-ring"
                     />

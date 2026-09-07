@@ -1,5 +1,5 @@
-import ProdukForm from '@/components/admin/ProdukForm'
+import { redirect } from "next/navigation"
 
-export default function TambahProdukPage() {
-  return <ProdukForm />
+export default function BaruProdukPage() {
+  redirect("/admin/produk/tambah")
 }
