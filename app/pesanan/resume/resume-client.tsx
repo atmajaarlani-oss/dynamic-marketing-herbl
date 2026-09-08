@@ -9,6 +9,8 @@ export default function ResumePage() {
   const [snapToken, setSnapToken] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [snapReady, setSnapReady] = useState(false)
+  const [paying, setPaying] = useState(false)
 
   useEffect(() => {
     if (!orderId) {
@@ -30,28 +32,46 @@ export default function ResumePage() {
 
   useEffect(() => {
     if (!snapToken) return
-    const existing = document.getElementById('snap-script')
-    if (existing) return
+
+    const existing = document.getElementById('snap-script') as HTMLScriptElement | null
+    if (existing) {
+      if ((window as any).snap) setSnapReady(true)
+      else existing.addEventListener('load', () => setSnapReady(true), { once: true })
+      return
+    }
 
     const script = document.createElement('script')
     script.id = 'snap-script'
-    script.src = 'https://app.sandbox.midtrans.com/snap/snap.js'
+    script.src = process.env.NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION === 'true'
+      ? 'https://app.midtrans.com/snap/snap.js'
+      : 'https://app.sandbox.midtrans.com/snap/snap.js'
     script.setAttribute('data-client-key', process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || '')
     script.async = true
+    script.onload = () => setSnapReady(true)
+    script.onerror = () => setError('Gagal memuat layanan pembayaran. Silakan muat ulang halaman.')
     document.body.appendChild(script)
   }, [snapToken])
 
+  const goToStatus = () => {
+    window.location.assign(`/pesanan/status?id=${encodeURIComponent(orderId || '')}`)
+  }
+
   const handlePay = () => {
-    if (typeof window !== 'undefined' && (window as any).snap && snapToken) {
-      ;(window as any).snap.pay(snapToken, {
-        onSuccess: () => {
-          window.location.href = `/pesanan/status?id=${encodeURIComponent(orderId || '')}`
-        },
-        onPending: () => {},
-        onError: () => {},
-        onClose: () => {},
-      })
-    }
+    const snap = (window as any).snap
+    if (!snap || !snapToken || !orderId || paying) return
+    setPaying(true)
+    snap.pay(snapToken, {
+      onSuccess: goToStatus,
+      onPending: goToStatus,
+      onError: () => {
+        setPaying(false)
+        setError('Pembayaran gagal. Silakan coba lagi atau hubungi WhatsApp.')
+      },
+      onClose: () => {
+        setPaying(false)
+        goToStatus()
+      },
+    })
   }
 
   if (loading) {
@@ -84,9 +104,17 @@ export default function ResumePage() {
           <p className="mt-2 text-sm text-muted-foreground">Order ID: <span className="font-mono font-medium">{orderId}</span></p>
           <button
             onClick={handlePay}
-            className="mt-6 w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90"
+            disabled={!snapReady || paying}
+            className="mt-6 w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Bayar Sekarang
+            {paying ? 'Membuka pembayaran...' : snapReady ? 'Bayar Sekarang' : 'Menyiapkan pembayaran...'}
+          </button>
+          <button
+            type="button"
+            onClick={goToStatus}
+            className="mt-3 w-full rounded-xl border border-border px-4 py-3 text-sm font-medium text-foreground hover:bg-muted"
+          >
+            Lihat status pesanan
           </button>
         </div>
       </div>
