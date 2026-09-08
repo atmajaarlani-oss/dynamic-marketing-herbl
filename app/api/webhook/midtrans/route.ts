@@ -185,13 +185,16 @@ export async function POST(request: Request) {
           origin_longitude,
         })
 
-        // STEP 9: Create Biteship order
+        // STEP 9: Create Biteship order with a bounded timeout so webhook retries remain safe.
+        const biteshipController = new AbortController()
+        const biteshipTimeout = setTimeout(() => biteshipController.abort(), 8000)
         const biteshipRes = await fetch('https://api.biteship.com/v1/orders', {
           method: 'POST',
           headers: {
             Authorization: apiKey,
             'Content-Type': 'application/json',
           },
+          signal: biteshipController.signal,
           body: JSON.stringify({
             origin_contact_name,
             origin_contact_phone,
@@ -221,6 +224,7 @@ export async function POST(request: Request) {
         })
 
         const biteshipData = await biteshipRes.json()
+        clearTimeout(biteshipTimeout)
         console.log('Biteship response status:', biteshipRes.status)
         console.log('Biteship response data:', JSON.stringify(biteshipData, null, 2))
 
