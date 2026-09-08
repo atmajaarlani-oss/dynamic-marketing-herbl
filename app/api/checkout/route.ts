@@ -180,6 +180,20 @@ export async function POST(request: NextRequest) {
 
     const snapToken = snapResponse.token
 
+    // Simpan token yang sama agar pembayaran dapat dilanjutkan setelah popup ditutup.
+    const { error: tokenUpdateError } = await supabase
+      .from('pesanan')
+      .update({ snap_token: snapToken })
+      .eq('midtrans_order_id', midtrans_order_id)
+
+    if (tokenUpdateError) {
+      console.error('[checkout] Failed to save Snap token', tokenUpdateError)
+      return NextResponse.json(
+        { success: false, error: 'Pembayaran dibuat, tetapi gagal menyiapkan pembayaran ulang.' },
+        { status: 500 },
+      )
+    }
+
     // 9. Return JSON
     return NextResponse.json({
       success: true,
