@@ -23,8 +23,12 @@ export default function ResumePage() {
       .then(async (res) => {
         if (!res.ok) throw new Error('Gagal mengambil token')
         const data = await res.json()
+        if (data.redirect_to_status || data.status !== 'pending') {
+          window.location.assign(`/pesanan/status?id=${encodeURIComponent(orderId)}`)
+          return
+        }
         if (data.snap_token) setSnapToken(data.snap_token)
-        else throw new Error('Token tidak tersedia')
+        else throw new Error(data.error || 'Token tidak tersedia')
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
