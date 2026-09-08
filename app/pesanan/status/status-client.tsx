@@ -224,6 +224,21 @@ export default function StatusClient({ orderId }: { orderId: string }) {
           </div>
         )}
 
+        {!isPaid && !isCancelled && (
+          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-6 dark:border-amber-900/30 dark:bg-amber-900/10">
+            <h3 className="font-semibold text-amber-800 dark:text-amber-200">Popup Pembayaran Tertutup</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Data pesanan sudah tersimpan, tapi pembayaran belum selesai. Klik untuk melanjutkan.
+            </p>
+            <a
+              href={`/pesanan/resume?order_id=${encodeURIComponent(order.order_id)}`}
+              className="mt-3 block w-full rounded-xl bg-primary px-4 py-3 text-center text-sm font-semibold text-primary-foreground shadow-sm hover:opacity-90"
+            >
+              Lanjutkan Pembayaran
+            </a>
+          </div>
+        )}
+
         <div className="mt-4">
           <a href={waLink()} target="_blank" rel="noreferrer"
             className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-primary px-4 py-3 text-sm font-semibold text-primary hover:bg-primary hover:text-primary-foreground transition">

@@ -151,7 +151,6 @@ export async function POST(request: Request) {
           }
         }
 
-<<<<<<< HEAD
         // STEP 8: Validate required Biteship origin env vars
         // No more hardcoded "Herbal Insani" — fail loudly if env is missing.
         let origin_contact_name: string
@@ -160,6 +159,7 @@ export async function POST(request: Request) {
         let origin_address: string
         let origin_latitude: number
         let origin_longitude: number
+        let apiKey: string
         try {
           origin_contact_name = readRequiredEnv('BITESHIP_ORIGIN_CONTACT_NAME')
           origin_contact_phone = readRequiredEnv('BITESHIP_ORIGIN_CONTACT_PHONE')
@@ -167,6 +167,7 @@ export async function POST(request: Request) {
           origin_address = readRequiredEnv('BITESHIP_ORIGIN_ADDRESS')
           origin_latitude = readNumberEnv('BITESHIP_ORIGIN_LATITUDE')
           origin_longitude = readNumberEnv('BITESHIP_ORIGIN_LONGITUDE')
+          apiKey = readRequiredEnv('BITESHIP_API_KEY')
         } catch (envErr) {
           const msg = envErr instanceof Error ? envErr.message : 'Biteship env var missing'
           console.error('Biteship skipped:', msg)
@@ -184,59 +185,23 @@ export async function POST(request: Request) {
           origin_longitude,
         })
 
-        // STEP 9: Create Biteship order
-=======
-        // STEP 8: Create Biteship order
-        const originContactName = process.env.BITESHIP_ORIGIN_CONTACT_NAME ?? ''
-        const originContactPhone = process.env.BITESHIP_ORIGIN_CONTACT_PHONE ?? ''
-        const originAreaId = process.env.BITESHIP_ORIGIN_AREA_ID ?? ''
-        const originAddress = process.env.BITESHIP_ORIGIN_ADDRESS ?? ''
-        const originLatitude = process.env.BITESHIP_ORIGIN_LATITUDE
-        const originLongitude = process.env.BITESHIP_ORIGIN_LONGITUDE
-        const apiKey = process.env.BITESHIP_API_KEY ?? ''
-
-        if (!apiKey || !originContactName || !originContactPhone || !originAreaId || !originAddress) {
-          console.error('Biteship skipped: missing required env vars', {
-            hasApiKey: !!apiKey,
-            hasOriginContactName: !!originContactName,
-            hasOriginContactPhone: !!originContactPhone,
-            hasOriginAreaId: !!originAreaId,
-            hasOriginAddress: !!originAddress,
-          })
-          return NextResponse.json({ message: 'OK' }, { status: 200 })
-        }
-
-        const originCoordinate: { latitude: number; longitude: number } | undefined =
-          originLatitude && originLongitude
-            ? {
-                latitude: Number(originLatitude),
-                longitude: Number(originLongitude),
-              }
-            : undefined
-
->>>>>>> origin
+        // STEP 9: Create Biteship order with a bounded timeout so webhook retries remain safe.
+        const biteshipController = new AbortController()
+        const biteshipTimeout = setTimeout(() => biteshipController.abort(), 8000)
         const biteshipRes = await fetch('https://api.biteship.com/v1/orders', {
           method: 'POST',
           headers: {
             Authorization: apiKey,
             'Content-Type': 'application/json',
           },
+          signal: biteshipController.signal,
           body: JSON.stringify({
-<<<<<<< HEAD
             origin_contact_name,
             origin_contact_phone,
             origin_area_id,
             origin_address,
             origin_latitude,
             origin_longitude,
-=======
-            origin_contact_name: originContactName,
-            origin_contact_phone: originContactPhone,
-            origin_area_id: originAreaId,
-            origin_address: originAddress,
-            origin_collection_method: 'pickup',
-            ...(originCoordinate ? { origin_coordinate: originCoordinate } : {}),
->>>>>>> origin
             destination_contact_name: fullPesanan.nama_pembeli,
             destination_contact_phone: fullPesanan.no_hp,
             destination_address: fullPesanan.alamat,
@@ -259,6 +224,7 @@ export async function POST(request: Request) {
         })
 
         const biteshipData = await biteshipRes.json()
+        clearTimeout(biteshipTimeout)
         console.log('Biteship response status:', biteshipRes.status)
         console.log('Biteship response data:', JSON.stringify(biteshipData, null, 2))
 

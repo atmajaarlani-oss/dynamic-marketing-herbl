@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase'
+import { createClient as createSupabaseAdmin } from '@supabase/supabase-js'
 
 const midtransClient = require('midtrans-client')
+
+function getAdminClient() {
+  return createSupabaseAdmin(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -50,13 +58,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-
-    // 3.2. Normalize wilayah data so we never accidentally insert null
-    const district_id = String(body.district_id).trim()
-    const district_name = String(body.district_name).trim()
-    const city_name = String(body.city_name).trim()
-    const province_name = String(body.province_name).trim()
-    const postal_code = String(body.postal_code).trim()
 
     // 4. Query Supabase table "produk"
     const supabase = await createClient()
@@ -133,6 +134,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const district_id = String(body.district_id).trim()
+
     // 7. Insert into Supabase table "pesanan"
     const insertPayload = {
       produk_id: body.produk_id,
@@ -148,25 +151,17 @@ export async function POST(request: NextRequest) {
       total_bayar: total_bayar,
       kurir_kode: body.kurir_kode,
       kurir_layanan: body.kurir_layanan,
-<<<<<<< HEAD
       district_id,
       district_name,
       city_name,
       province_name,
       postal_code,
-=======
-      district_id: body.district_id,
-      district_name: district_name,
-      city_name: city_name,
-      province_name: province_name,
-      postal_code: postal_code,
-      destination_area_details: destination_area_details,
->>>>>>> origin
       midtrans_order_id: midtrans_order_id,
       status: 'pending',
     }
 
-    const { error: insertError } = await supabase.from('pesanan').insert(insertPayload)
+    const adminSupabase = getAdminClient()
+    const { error: insertError } = await adminSupabase.from('pesanan').insert(insertPayload)
 
     if (insertError) {
       return NextResponse.json(
@@ -192,7 +187,28 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    const snapToken = snapResponse.token
+    const snapToken = typeof snapResponse?.token === 'string' ? snapResponse.token.trim() : ''
+    if (!snapToken) {
+      console.error('[checkout] Midtrans returned an empty Snap token')
+      return NextResponse.json(
+        { success: false, error: 'Midtrans tidak mengembalikan token pembayaran.' },
+        { status: 502 },
+      )
+    }
+
+    // Simpan token yang sama agar pembayaran dapat dilanjutkan setelah popup ditutup.
+    const { error: tokenUpdateError } = await adminSupabase
+      .from('pesanan')
+      .update({ snap_token: snapToken })
+      .eq('midtrans_order_id', midtrans_order_id)
+
+    if (tokenUpdateError) {
+      console.error('[checkout] Failed to save Snap token', tokenUpdateError)
+      return NextResponse.json(
+        { success: false, error: 'Pembayaran dibuat, tetapi gagal menyiapkan pembayaran ulang.' },
+        { status: 500 },
+      )
+    }
 
     // 9. Return JSON
     return NextResponse.json({
