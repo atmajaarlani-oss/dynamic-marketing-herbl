@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { createClient as createSupabaseAdmin } from '@supabase/supabase-js'
-import Midtrans from 'midtrans-client'
 
 function getAdminClient() {
   return createSupabaseAdmin(
@@ -22,7 +21,7 @@ export async function GET(request: Request) {
 
   const { data, error } = await supabase
     .from('pesanan')
-    .select('midtrans_order_id, total_bayar, nama_pembeli, nama_produk, jumlah')
+    .select('midtrans_order_id, snap_token, status')
     .eq('midtrans_order_id', orderId)
     .single()
 
@@ -30,36 +29,22 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Pesanan tidak ditemukan' }, { status: 404 })
   }
 
-  const snap = new Midtrans.Snap({
-    isProduction: process.env.MIDTRANS_IS_PRODUCTION === 'true',
-    serverKey: process.env.MIDTRANS_SERVER_KEY!,
-  })
-
-  try {
-    const transaction = await snap.createTransaction({
-      transaction_details: {
-        order_id: data.midtrans_order_id,
-        gross_amount: Number(data.total_bayar) || 0,
-      },
-      customer_details: {
-        first_name: data.nama_pembeli || 'Pelanggan',
-        email: 'pelanggan@herbalinsani.com',
-      },
-      item_details: [
-        {
-          id: data.midtrans_order_id,
-          price: Math.round((Number(data.total_bayar) || 0) / (Number(data.jumlah) || 1)),
-          quantity: Number(data.jumlah) || 1,
-          name: data.nama_produk || 'Produk',
-        },
-      ],
-    })
-
-    return NextResponse.json({
-      snap_token: transaction.token,
-      order_id: data.midtrans_order_id,
-    })
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Gagal membuat token Snap' }, { status: 500 })
+  if (data.status !== 'pending') {
+    return NextResponse.json(
+      { error: 'Pembayaran ini sudah tidak dapat dilanjutkan.', status: data.status },
+      { status: 409 },
+    )
   }
+
+  if (!data.snap_token) {
+    return NextResponse.json(
+      { error: 'Token pembayaran tidak tersedia. Silakan hubungi kami untuk bantuan.' },
+      { status: 409 },
+    )
+  }
+
+  return NextResponse.json({
+    snap_token: data.snap_token,
+    order_id: data.midtrans_order_id,
+  })
 }
