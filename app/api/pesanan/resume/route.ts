@@ -54,7 +54,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const snap = new Midtrans.Snap({
+    const snap = new midtransClient.Snap({
       isProduction: process.env.NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION === 'true',
       serverKey: process.env.MIDTRANS_SERVER_KEY,
     })

@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase'
+import { createClient as createSupabaseAdmin } from '@supabase/supabase-js'
 
 const midtransClient = require('midtrans-client')
+
+function getAdminClient() {
+  return createSupabaseAdmin(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -152,7 +160,8 @@ export async function POST(request: NextRequest) {
       status: 'pending',
     }
 
-    const { error: insertError } = await supabase.from('pesanan').insert(insertPayload)
+    const adminSupabase = getAdminClient()
+    const { error: insertError } = await adminSupabase.from('pesanan').insert(insertPayload)
 
     if (insertError) {
       return NextResponse.json(
@@ -178,10 +187,17 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    const snapToken = snapResponse.token
+    const snapToken = typeof snapResponse?.token === 'string' ? snapResponse.token.trim() : ''
+    if (!snapToken) {
+      console.error('[checkout] Midtrans returned an empty Snap token')
+      return NextResponse.json(
+        { success: false, error: 'Midtrans tidak mengembalikan token pembayaran.' },
+        { status: 502 },
+      )
+    }
 
     // Simpan token yang sama agar pembayaran dapat dilanjutkan setelah popup ditutup.
-    const { error: tokenUpdateError } = await supabase
+    const { error: tokenUpdateError } = await adminSupabase
       .from('pesanan')
       .update({ snap_token: snapToken })
       .eq('midtrans_order_id', midtrans_order_id)
