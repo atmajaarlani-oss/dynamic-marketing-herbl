@@ -33,6 +33,18 @@ export function Hero({
   onBuyClick,
   onChatClick,
 }: HeroProps) {
+  const handleBuyClick = () => {
+    if (onBuyClick) {
+      onBuyClick()
+      return
+    }
+
+    document.getElementById('transaksi-form')?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    })
+  }
+
   const handleKenaliClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault()
     const target = document.getElementById('edukasi')
