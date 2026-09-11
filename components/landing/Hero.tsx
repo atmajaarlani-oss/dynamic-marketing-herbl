@@ -90,7 +90,7 @@ export function Hero({
           <div className="mt-8 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
             <button
               type="button"
-              onClick={onBuyClick}
+              onClick={handleBuyClick}
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#35513a] px-6 py-3 text-sm font-semibold text-[#fffaf1] shadow-[0_8px_18px_rgba(53,81,58,0.2)] transition hover:bg-[#263f2c] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#35513a] focus-visible:ring-offset-2"
             >
               Beli Sekarang
