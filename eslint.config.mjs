@@ -6,14 +6,14 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   globalIgnores([
-  ".next/**",
-  ".open-next/**",
-  ".wrangler/**",
-  "out/**",
-  "build/**",
-  "next-env.d.ts",
-  "cloudflare-env.d.ts",
-]), "build/**", "next-env.d.ts"]),
+    ".next/**",
+    ".open-next/**",
+    ".wrangler/**",
+    "out/**",
+    "build/**",
+    "next-env.d.ts",
+    "cloudflare-env.d.ts",
+  ]),
 ]);
 
 export default eslintConfig;
