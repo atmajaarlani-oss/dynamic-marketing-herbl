@@ -200,8 +200,10 @@ export async function POST(request: Request) {
             origin_contact_phone,
             origin_area_id,
             origin_address,
-            origin_latitude,
-            origin_longitude,
+            origin_coordinate: {
+              latitude: origin_latitude,
+              longitude: origin_longitude,
+            },
             destination_contact_name: fullPesanan.nama_pembeli,
             destination_contact_phone: fullPesanan.no_hp,
             destination_address: fullPesanan.alamat,
