@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next'
 import { createClient } from '@/lib/supabase'
 
-export const dynamic = 'force-static'
+export const dynamic = 'force-dynamic'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const supabase = await createClient()
