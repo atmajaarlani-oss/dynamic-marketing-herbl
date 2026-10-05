@@ -13,4 +13,13 @@
 4. **Tailwind v4:** Gunakan sintaks Tailwind CSS v4 standar tanpa konfigurasi tambahan yang tidak perlu jika sudah ditangani oleh postCSS.
 
 ## target publish
-1. cloudflare
+- cloudflare
+
+## Aturan Lint & Refactoring
+- Refactoring tidak boleh mengubah perilaku. Ubah struktur/tipe saja, jangan logika bisnis.
+- Ganti `any` dengan tipe yang benar, atau `unknown` + penyempitan tipe jika tipenya belum jelas.
+- Ganti `require()` dengan `import`.
+- Hapus variabel/import yang tidak dipakai; kalau parameter wajib ada tapi tidak dipakai, awali dengan `_`.
+- Kerjakan per file, kecil-kecil. Setelah selesai, `pnpm run lint:file` dan `pnpm run typecheck` harus lulus.
+- Jangan ubah logika pembayaran (Midtrans), ongkir (Biteship), dan auth (Supabase) tanpa konfirmasi saya.
+- Jangan baca atau ubah file `.env*`.
