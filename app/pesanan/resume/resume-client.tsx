@@ -53,7 +53,7 @@ export default function ResumePage() {
     const existing = document.getElementById('snap-script') as HTMLScriptElement | null
     if (existing) {
       Promise.resolve().then(() => {
-        if ((window as unknown).snap) setSnapReady(true)
+        if (window.snap) setSnapReady(true)
         else existing.addEventListener('load', () => setSnapReady(true), { once: true })
       })
       return
@@ -76,7 +76,7 @@ export default function ResumePage() {
   }
 
   const handlePay = () => {
-    const snap = (window as unknown).snap
+    const snap = window.snap
     if (!snap || !snapToken || !orderId || paying) return
     setPaying(true)
     snap.pay(snapToken, {

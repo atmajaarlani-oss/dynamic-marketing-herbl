@@ -213,9 +213,10 @@ export async function POST(request: NextRequest) {
       token: snapToken,
       order_id: midtrans_order_id,
     })
-  } catch (error: unknown) {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Terjadi error nggak dikenal, coba lagi nanti ya!'
     return NextResponse.json(
-      { success: false, error: error?.message || 'Terjadi error nggak dikenal, coba lagi nanti ya!' },
+      { success: false, error: message },
       { status: 500 }
     )
   }
