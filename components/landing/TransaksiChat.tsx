@@ -1,6 +1,7 @@
 'use client'
 
 import { FormEvent, useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { formatRupiah } from '@/lib/harga'
 import { ChevronRight, ChevronLeft, Truck, CreditCard, User, MapPin, CheckCircle, Minus, Plus } from 'lucide-react'
@@ -53,9 +54,9 @@ export function TransaksiChat({
   beratPerUnit = 1000,
   productId,
 }: TransaksiChatProps) {
+  const router = useRouter()
   const [currentStep, setCurrentStep] = useState<Step>(1)
   const [loading, setLoading] = useState(false)
-  const [orderId, setOrderId] = useState<string | null>(null)
   const formCardRef = useRef<HTMLDivElement>(null)
 
   const [name, setName] = useState('')
@@ -109,8 +110,10 @@ export function TransaksiChat({
     const searchQuery = words.length > 2 ? words[words.length - 1] : query.trim()
 
     if (!searchQuery || searchQuery.length < 3) {
-      setResults([])
-      setSearchLoading(false)
+      Promise.resolve().then(() => {
+        setResults([])
+        setSearchLoading(false)
+      })
       return
     }
 
@@ -119,11 +122,11 @@ export function TransaksiChat({
       searchControllerRef.current = null
     }
 
-    setSearchLoading(true)
     const timer = setTimeout(() => {
       const controller = new AbortController()
       searchControllerRef.current = controller
 
+      setSearchLoading(true)
       fetch(`/api/area-search?input=${encodeURIComponent(searchQuery)}&countries=ID&type=single`, {
         signal: controller.signal,
       })
@@ -189,10 +192,11 @@ export function TransaksiChat({
     courierControllerRef.current = controller
 
     const totalWeight = quantity * beratPerUnit
-    setCourierLoading(true)
-    setCourierError(null)
-    setCourierList([])
-    setSelectedCourier(null)
+    Promise.resolve().then(() => {
+      setCourierError(null)
+      setCourierList([])
+      setSelectedCourier(null)
+    })
 
     fetch('/api/ongkir', {
       method: 'POST',
@@ -205,6 +209,7 @@ export function TransaksiChat({
     })
       .then(res => {
         if (!res.ok) throw new Error('Ongkir fetch failed')
+        setCourierLoading(false)
         return res.json()
       })
       .then(data => {
@@ -297,7 +302,7 @@ export function TransaksiChat({
     return { district: null, city: null, province: null, postal: null }
   }
 
-  const handleQuantityChange = (value: number) => {
+  const _handleQuantityChange = (value: number) => {
     setQuantity(Math.min(MAX_QUANTITY, Math.max(1, value)))
   }
 
@@ -372,17 +377,15 @@ export function TransaksiChat({
         throw new Error(data.error ?? 'Checkout gagal. Coba lagi.')
       }
 
-      if (data.order_id) setOrderId(data.order_id)
-
       const currentOrderId = data.order_id ?? '';
-      ;(window as any).snap.pay(data.token, {
-        onSuccess: (result: unknown) => {
+      window.snap?.pay(data.token, {
+        onSuccess: (_result: unknown) => {
           setLoading(false)
-          window.location.href = `/pesanan/${data.order_id}`
+          router.push(`/pesanan/${data.order_id}`)
         },
-        onPending: (result: unknown) => {
+        onPending: (_result: unknown) => {
           setLoading(false)
-          window.location.href = `/pesanan/${data.order_id}`
+          router.push(`/pesanan/${data.order_id}`)
         },
         onError: (_result: unknown) => {
           setLoading(false)
@@ -391,7 +394,7 @@ export function TransaksiChat({
         onClose: () => {
           setLoading(false)
           if (currentOrderId) {
-            window.location.href = `/pesanan/status?id=${currentOrderId}`
+            router.push(`/pesanan/status?id=${currentOrderId}`)
           }
         },
       })

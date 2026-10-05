@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase'
 import { createClient as createSupabaseAdmin } from '@supabase/supabase-js'
-
-const midtransClient = require('midtrans-client')
+import midtransClient from 'midtrans-client'
 
 function getAdminClient() {
   return createSupabaseAdmin(
@@ -90,7 +89,6 @@ export async function POST(request: NextRequest) {
     let city_name = body.city_name ?? null
     let province_name = body.province_name ?? null
     let postal_code = body.postal_code ? String(body.postal_code) : null
-    let destination_area_details: Record<string, unknown> | null = null
 
     const hasAreaGaps = !district_name || !city_name || !province_name || !postal_code
 
@@ -111,7 +109,6 @@ export async function POST(request: NextRequest) {
           const areaData = await areaRes.json()
           if (areaData.success && Array.isArray(areaData.areas) && areaData.areas.length > 0) {
             const area = areaData.areas[0]
-            destination_area_details = area
             district_name = district_name || area.administrative_division_level_3_name || null
             city_name = city_name || area.administrative_division_level_2_name || null
             province_name = province_name || area.administrative_division_level_1_name || null
@@ -216,9 +213,10 @@ export async function POST(request: NextRequest) {
       token: snapToken,
       order_id: midtrans_order_id,
     })
-  } catch (error: any) {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Terjadi error nggak dikenal, coba lagi nanti ya!'
     return NextResponse.json(
-      { success: false, error: error?.message || 'Terjadi error nggak dikenal, coba lagi nanti ya!' },
+      { success: false, error: message },
       { status: 500 }
     )
   }

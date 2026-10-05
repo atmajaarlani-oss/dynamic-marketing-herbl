@@ -36,17 +36,17 @@ export default function StatusClient({ orderId }: { orderId: string }) {
 
   useEffect(() => {
     if (!orderId || orderId.trim() === '') {
-      setError('Order ID tidak ditemukan di URL.')
-      setLoading(false)
+      Promise.resolve().then(() => {
+        setError('Order ID tidak ditemukan di URL.')
+        setLoading(false)
+      })
       return
     }
 
     let cancelled = false
 
-    async function load() {
-      try {
-        const res = await fetch(`/api/pesanan/status?id=${orderId}`)
-
+    fetch(`/api/pesanan/status?id=${orderId}`)
+      .then(async (res) => {
         if (cancelled) return
 
         if (!res.ok) {
@@ -58,18 +58,16 @@ export default function StatusClient({ orderId }: { orderId: string }) {
         const data: OrderStatus = await res.json()
         setOrder(data)
         setLoading(false)
-      } catch (err) {
+      })
+      .catch((err) => {
         if (!cancelled) {
           setError('Gagal terhubung ke server.')
           setLoading(false)
         }
-      }
-    }
-
-    load()
+      })
 
     return () => { cancelled = true }
-  }, [orderId])
+  }, [orderId, setError, setLoading])
 
   // Polling for pending/paid without resi
   useEffect(() => {
@@ -96,7 +94,7 @@ export default function StatusClient({ orderId }: { orderId: string }) {
           const data: OrderStatus = await res.json()
           setOrder(data)
         }
-      } catch {
+      } catch (_err) {
         // silent - keep polling
       }
     }, 5000)
