@@ -122,11 +122,11 @@ export function TransaksiChat({
       searchControllerRef.current = null
     }
 
-    setSearchLoading(true)
     const timer = setTimeout(() => {
       const controller = new AbortController()
       searchControllerRef.current = controller
 
+      setSearchLoading(true)
       fetch(`/api/area-search?input=${encodeURIComponent(searchQuery)}&countries=ID&type=single`, {
         signal: controller.signal,
       })
