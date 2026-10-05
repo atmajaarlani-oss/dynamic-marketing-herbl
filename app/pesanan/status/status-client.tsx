@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useCallback, useEffect, useState, useRef } from 'react'
 import { CircleCheck as CheckCircle, Clock, Truck, Copy, MessageCircle, Circle as XCircle, Package } from 'lucide-react'
 import { trackEvent } from '@/components/analytics/MetaPixel'
 
@@ -34,7 +34,7 @@ export default function StatusClient({ orderId }: { orderId: string }) {
   const [copied, setCopied] = useState(false)
   const purchaseTrackedRef = useRef(false)
 
-  useEffect(() => {
+  const loadOrder = useCallback(() => {
     if (!orderId || orderId.trim() === '') {
       setError('Order ID tidak ditemukan di URL.')
       setLoading(false)
@@ -69,7 +69,11 @@ export default function StatusClient({ orderId }: { orderId: string }) {
     load()
 
     return () => { cancelled = true }
-  }, [orderId])
+  }, [orderId, setError, setLoading])
+
+  useEffect(() => {
+    loadOrder()
+  }, [loadOrder])
 
   // Polling for pending/paid without resi
   useEffect(() => {

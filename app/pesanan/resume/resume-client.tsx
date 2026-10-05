@@ -1,7 +1,7 @@
 'use client'
 
-import { useSearchParams } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
+import { useCallback, useEffect, useState } from 'react'
 
 export default function ResumePage() {
   const searchParams = useSearchParams()
@@ -12,7 +12,7 @@ export default function ResumePage() {
   const [snapReady, setSnapReady] = useState(false)
   const [paying, setPaying] = useState(false)
 
-  useEffect(() => {
+  const loadToken = useCallback(() => {
     if (!orderId) {
       setError('Order ID tidak ditemukan.')
       setLoading(false)
@@ -24,7 +24,7 @@ export default function ResumePage() {
         if (!res.ok) throw new Error('Gagal mengambil token')
         const data = await res.json()
         if (data.redirect_to_status || data.status !== 'pending') {
-          window.location.assign(`/pesanan/status?id=${encodeURIComponent(orderId)}`)
+          router.push(`/pesanan/status?id=${encodeURIComponent(orderId)}`)
           return
         }
         if (data.snap_token) setSnapToken(data.snap_token)
@@ -32,14 +32,18 @@ export default function ResumePage() {
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
-  }, [orderId])
+  }, [orderId, router, setError, setLoading, setSnapToken])
 
   useEffect(() => {
+    loadToken()
+  }, [loadToken])
+
+  const loadSnapScript = useCallback(() => {
     if (!snapToken) return
 
     const existing = document.getElementById('snap-script') as HTMLScriptElement | null
     if (existing) {
-      if ((window as any).snap) setSnapReady(true)
+      if ((window as unknown).snap) setSnapReady(true)
       else existing.addEventListener('load', () => setSnapReady(true), { once: true })
       return
     }
@@ -54,10 +58,14 @@ export default function ResumePage() {
     script.onload = () => setSnapReady(true)
     script.onerror = () => setError('Gagal memuat layanan pembayaran. Silakan muat ulang halaman.')
     document.body.appendChild(script)
-  }, [snapToken])
+  }, [snapToken, setSnapReady, setError])
+
+  useEffect(() => {
+    loadSnapScript()
+  }, [loadSnapScript])
 
   const goToStatus = () => {
-    window.location.assign(`/pesanan/status?id=${encodeURIComponent(orderId || '')}`)
+    router.push(`/pesanan/status?id=${encodeURIComponent(orderId || '')}`)
   }
 
   const handlePay = () => {

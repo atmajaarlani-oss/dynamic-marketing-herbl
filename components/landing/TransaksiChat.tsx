@@ -1,6 +1,7 @@
 'use client'
 
 import { FormEvent, useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { formatRupiah } from '@/lib/harga'
 import { ChevronRight, ChevronLeft, Truck, CreditCard, User, MapPin, CheckCircle, Minus, Plus } from 'lucide-react'
@@ -189,7 +190,6 @@ export function TransaksiChat({
     courierControllerRef.current = controller
 
     const totalWeight = quantity * beratPerUnit
-    setCourierLoading(true)
     setCourierError(null)
     setCourierList([])
     setSelectedCourier(null)
@@ -205,6 +205,7 @@ export function TransaksiChat({
     })
       .then(res => {
         if (!res.ok) throw new Error('Ongkir fetch failed')
+        setCourierLoading(false)
         return res.json()
       })
       .then(data => {
@@ -375,10 +376,10 @@ export function TransaksiChat({
       if (data.order_id) setOrderId(data.order_id)
 
       const currentOrderId = data.order_id ?? '';
-      ;(window as any).snap.pay(data.token, {
+      ;(window as unknown).snap.pay(data.token, {
         onSuccess: (result: unknown) => {
           setLoading(false)
-          window.location.href = `/pesanan/${data.order_id}`
+          router.push(`/pesanan/${data.order_id}`)
         },
         onPending: (result: unknown) => {
           setLoading(false)
@@ -391,7 +392,7 @@ export function TransaksiChat({
         onClose: () => {
           setLoading(false)
           if (currentOrderId) {
-            window.location.href = `/pesanan/status?id=${currentOrderId}`
+            router.push(`/pesanan/status?id=${currentOrderId}`)
           }
         },
       })

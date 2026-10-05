@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient as createSupabaseAdmin } from '@supabase/supabase-js'
-const midtransClient = require('midtrans-client')
+import midtransClient from 'midtrans-client'
 
 function getAdminClient() {
   return createSupabaseAdmin(
