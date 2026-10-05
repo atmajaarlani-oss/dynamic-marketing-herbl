@@ -57,7 +57,6 @@ export function TransaksiChat({
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState<Step>(1)
   const [loading, setLoading] = useState(false)
-  const [_orderId, setOrderId] = useState<string | null>(null)
   const formCardRef = useRef<HTMLDivElement>(null)
 
   const [name, setName] = useState('')
@@ -172,6 +171,7 @@ export function TransaksiChat({
     }, 500)
 
     return () => {
+      cancelled = true
       clearTimeout(timer)
       if (searchControllerRef.current) {
         searchControllerRef.current.abort()

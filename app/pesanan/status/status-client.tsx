@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { CircleCheck as CheckCircle, Clock, Truck, Copy, MessageCircle, Circle as XCircle, Package } from 'lucide-react'
 import { trackEvent } from '@/components/analytics/MetaPixel'
 
@@ -94,7 +94,7 @@ export default function StatusClient({ orderId }: { orderId: string }) {
           const data: OrderStatus = await res.json()
           setOrder(data)
         }
-      } catch {
+      } catch (_err) {
         // silent - keep polling
       }
     }, 5000)
