@@ -171,7 +171,6 @@ export function TransaksiChat({
     }, 500)
 
     return () => {
-      cancelled = true
       clearTimeout(timer)
       if (searchControllerRef.current) {
         searchControllerRef.current.abort()
@@ -378,10 +377,8 @@ export function TransaksiChat({
         throw new Error(data.error ?? 'Checkout gagal. Coba lagi.')
       }
 
-      if (data.order_id) setOrderId(data.order_id)
-
       const currentOrderId = data.order_id ?? '';
-      ;(window as unknown).snap.pay(data.token, {
+      window.snap?.pay(data.token, {
         onSuccess: (_result: unknown) => {
           setLoading(false)
           router.push(`/pesanan/${data.order_id}`)

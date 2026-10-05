@@ -55,7 +55,7 @@ export async function GET(request: Request) {
       JSON.stringify({
         success: false,
         message: 'Failed to fetch area data from Biteship',
-        details: (data as unknown).message ?? 'Unknown error',
+        details: (data as { message?: unknown }).message ?? 'Unknown error',
       }),
       { status: biteshipResponse.status, headers: { 'Content-Type': 'application/json' } }
     );
