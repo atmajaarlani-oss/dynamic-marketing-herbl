@@ -1,9 +1,11 @@
 'use client'
 
-import { useSearchParams, useRouter } from 'next/navigation'
-import { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 export default function ResumePage() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const orderId = searchParams.get('order_id')
   const [snapToken, setSnapToken] = useState<string | null>(null)
@@ -12,15 +14,20 @@ export default function ResumePage() {
   const [snapReady, setSnapReady] = useState(false)
   const [paying, setPaying] = useState(false)
 
-  const loadToken = useCallback(() => {
+  useEffect(() => {
     if (!orderId) {
-      setError('Order ID tidak ditemukan.')
-      setLoading(false)
+      Promise.resolve().then(() => {
+        setError('Order ID tidak ditemukan.')
+        setLoading(false)
+      })
       return
     }
 
+    let cancelled = false
+
     fetch(`/api/pesanan/resume?order_id=${encodeURIComponent(orderId)}`)
       .then(async (res) => {
+        if (cancelled) return
         if (!res.ok) throw new Error('Gagal mengambil token')
         const data = await res.json()
         if (data.redirect_to_status || data.status !== 'pending') {
@@ -30,21 +37,25 @@ export default function ResumePage() {
         if (data.snap_token) setSnapToken(data.snap_token)
         else throw new Error(data.error || 'Token tidak tersedia')
       })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false))
-  }, [orderId, router, setError, setLoading, setSnapToken])
+      .catch((err) => {
+        if (!cancelled) setError(err.message)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => { cancelled = true }
+  }, [orderId, router])
 
   useEffect(() => {
-    loadToken()
-  }, [loadToken])
-
-  const loadSnapScript = useCallback(() => {
     if (!snapToken) return
 
     const existing = document.getElementById('snap-script') as HTMLScriptElement | null
     if (existing) {
-      if ((window as unknown).snap) setSnapReady(true)
-      else existing.addEventListener('load', () => setSnapReady(true), { once: true })
+      Promise.resolve().then(() => {
+        if ((window as unknown).snap) setSnapReady(true)
+        else existing.addEventListener('load', () => setSnapReady(true), { once: true })
+      })
       return
     }
 
@@ -60,16 +71,12 @@ export default function ResumePage() {
     document.body.appendChild(script)
   }, [snapToken, setSnapReady, setError])
 
-  useEffect(() => {
-    loadSnapScript()
-  }, [loadSnapScript])
-
   const goToStatus = () => {
     router.push(`/pesanan/status?id=${encodeURIComponent(orderId || '')}`)
   }
 
   const handlePay = () => {
-    const snap = (window as any).snap
+    const snap = (window as unknown).snap
     if (!snap || !snapToken || !orderId || paying) return
     setPaying(true)
     snap.pay(snapToken, {

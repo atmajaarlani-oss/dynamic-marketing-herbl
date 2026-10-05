@@ -54,9 +54,10 @@ export function TransaksiChat({
   beratPerUnit = 1000,
   productId,
 }: TransaksiChatProps) {
+  const router = useRouter()
   const [currentStep, setCurrentStep] = useState<Step>(1)
   const [loading, setLoading] = useState(false)
-  const [orderId, setOrderId] = useState<string | null>(null)
+  const [_orderId, setOrderId] = useState<string | null>(null)
   const formCardRef = useRef<HTMLDivElement>(null)
 
   const [name, setName] = useState('')
@@ -110,8 +111,10 @@ export function TransaksiChat({
     const searchQuery = words.length > 2 ? words[words.length - 1] : query.trim()
 
     if (!searchQuery || searchQuery.length < 3) {
-      setResults([])
-      setSearchLoading(false)
+      Promise.resolve().then(() => {
+        setResults([])
+        setSearchLoading(false)
+      })
       return
     }
 
@@ -190,9 +193,11 @@ export function TransaksiChat({
     courierControllerRef.current = controller
 
     const totalWeight = quantity * beratPerUnit
-    setCourierError(null)
-    setCourierList([])
-    setSelectedCourier(null)
+    Promise.resolve().then(() => {
+      setCourierError(null)
+      setCourierList([])
+      setSelectedCourier(null)
+    })
 
     fetch('/api/ongkir', {
       method: 'POST',
@@ -298,7 +303,7 @@ export function TransaksiChat({
     return { district: null, city: null, province: null, postal: null }
   }
 
-  const handleQuantityChange = (value: number) => {
+  const _handleQuantityChange = (value: number) => {
     setQuantity(Math.min(MAX_QUANTITY, Math.max(1, value)))
   }
 
@@ -377,13 +382,13 @@ export function TransaksiChat({
 
       const currentOrderId = data.order_id ?? '';
       ;(window as unknown).snap.pay(data.token, {
-        onSuccess: (result: unknown) => {
+        onSuccess: (_result: unknown) => {
           setLoading(false)
           router.push(`/pesanan/${data.order_id}`)
         },
-        onPending: (result: unknown) => {
+        onPending: (_result: unknown) => {
           setLoading(false)
-          window.location.href = `/pesanan/${data.order_id}`
+          router.push(`/pesanan/${data.order_id}`)
         },
         onError: (_result: unknown) => {
           setLoading(false)

@@ -58,7 +58,7 @@ export default function StatusClient({ orderId }: { orderId: string }) {
         const data: OrderStatus = await res.json()
         setOrder(data)
         setLoading(false)
-      } catch (err) {
+      } catch (_err) {
         if (!cancelled) {
           setError('Gagal terhubung ke server.')
           setLoading(false)
