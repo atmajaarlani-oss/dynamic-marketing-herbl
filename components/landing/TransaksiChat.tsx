@@ -1,6 +1,7 @@
 'use client'
 
 import { FormEvent, useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { formatRupiah } from '@/lib/harga'
 import { ChevronRight, ChevronLeft, Truck, CreditCard, User, MapPin, CheckCircle } from 'lucide-react'
@@ -48,6 +49,7 @@ export function TransaksiChat({ whatsappNumber = '6281234567890', hargaProduk, p
   const [loading, setLoading] = useState(false)
   const [pesan, setPesan] = useState<{ tipe: 'error' | 'info'; teks: string } | null>(null)
   const formCardRef = useRef<HTMLDivElement>(null)
+  const router = useRouter()
 
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
@@ -168,17 +170,19 @@ export function TransaksiChat({ whatsappNumber = '6281234567890', hargaProduk, p
           quote: selectedCourier.quote,
         }),
       })
-      const data = (await res.json()) as { success: boolean; token?: string; error?: string }
+      const data = (await res.json()) as { success: boolean; token?: string; error?: string; order_id?: string }
       if (!res.ok || !data.success || !data.token) throw new Error(data.error ?? 'Checkout gagal. Coba lagi.')
+
+      const orderId = data.order_id ?? ''
 
       const snap = (window as SnapWindow).snap
       if (!snap) throw new Error('Halaman pembayaran belum siap. Muat ulang halaman lalu coba lagi.')
 
       snap.pay(data.token, {
-        onSuccess: () => { setLoading(false); setPesan({ tipe: 'info', teks: 'Pembayaran berhasil! Pesanan Anda sedang diproses.' }) },
-        onPending: () => { setLoading(false); setPesan({ tipe: 'info', teks: 'Menunggu pembayaran. Kami akan konfirmasi setelah pembayaran diterima.' }) },
+        onSuccess: () => { setLoading(false); router.push(`/pesanan/status?id=${encodeURIComponent(orderId)}`) },
+        onPending: () => { setLoading(false); router.push(`/pesanan/status?id=${encodeURIComponent(orderId)}`) },
         onError: () => { setLoading(false); setPesan({ tipe: 'error', teks: 'Pembayaran gagal. Silakan coba lagi.' }) },
-        onClose: () => setLoading(false),
+        onClose: () => { setLoading(false); router.push(`/pesanan/status?id=${encodeURIComponent(orderId)}`) },
       })
     } catch (err) {
       setLoading(false)
