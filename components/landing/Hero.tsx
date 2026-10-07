@@ -31,7 +31,6 @@ export function Hero({
   nomorBpom,
   halalTersertifikasi,
   onBuyClick,
-  onChatClick,
 }: HeroProps) {
   const handleBuyClick = () => {
     if (onBuyClick) {
