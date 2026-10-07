@@ -373,21 +373,21 @@ export function TransaksiChat({
         body: JSON.stringify(payload),
       })
 
-      const data = await res.json()
+      const data: { success?: boolean; error?: string; token?: string; order_id?: string } = await res.json()
 
       if (!res.ok || !data.success) {
         throw new Error(data.error ?? 'Checkout gagal. Coba lagi.')
       }
 
-      const currentOrderId = data.order_id ?? '';
+      const orderId = data.order_id ?? '';
       window.snap?.pay(data.token, {
         onSuccess: (_result: unknown) => {
           setLoading(false)
-          router.push(`/pesanan/${data.order_id}`)
+          router.push(`/pesanan/status?id=${encodeURIComponent(orderId)}`)
         },
         onPending: (_result: unknown) => {
           setLoading(false)
-          router.push(`/pesanan/${data.order_id}`)
+          router.push(`/pesanan/status?id=${encodeURIComponent(orderId)}`)
         },
         onError: (_result: unknown) => {
           setLoading(false)
@@ -395,9 +395,7 @@ export function TransaksiChat({
         },
         onClose: () => {
           setLoading(false)
-          if (currentOrderId) {
-            router.push(`/pesanan/status?id=${currentOrderId}`)
-          }
+          router.push(`/pesanan/status?id=${encodeURIComponent(orderId)}`)
         },
       })
     } catch (err) {
