@@ -66,6 +66,8 @@ export default async function ProdukDetailPage({ params }: { params: Promise<{ s
   const stok = product.stok
   const isAvailable = stok !== null && stok !== undefined && stok > 0
 
+  const hargaJual = Number(product.harga_diskon) > 0 ? Number(product.harga_diskon) : Number(product.harga_utama ?? 0)
+
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Product',
@@ -104,9 +106,9 @@ export default async function ProdukDetailPage({ params }: { params: Promise<{ s
       <KeunggulanInsani producerName="PT Insani" story={PENGATURAN_GLOBAL.keunggulanPtInsani} />
       <TransaksiChat
         whatsappNumber={whatsappNumber}
-        hargaProduk={hargaDiskon}
-        beratPerUnit={Number(product.berat_gram ?? 1000)}
+        hargaProduk={hargaJual}
         productId={String(product.id)}
+        stok={Number(product.stok ?? 0)}
       />
       <RiskReversal policy={`${PENGATURAN_GLOBAL.syaratKetentuan} ${PENGATURAN_GLOBAL.disclaimerMedis}`} />
       <footer className="border-t border-border bg-muted/30 px-4 py-8 text-center text-sm text-muted-foreground">
