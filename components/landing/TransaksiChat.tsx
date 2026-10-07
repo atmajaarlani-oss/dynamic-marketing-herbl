@@ -70,6 +70,7 @@ export function TransaksiChat({ whatsappNumber = '6281234567890', hargaProduk, p
   const subtotal = hargaProduk * quantity
   const ongkir = selectedCourier?.harga ?? 0
   const total = subtotal + ongkir
+  const isStep2 = currentStep === 2
 
   const isStep1Valid =
     name.trim().length >= 2 && phone.trim().length >= 9 && address.trim().length >= 10 && selected !== null && quantity >= 1
@@ -331,7 +332,7 @@ export function TransaksiChat({ whatsappNumber = '6281234567890', hargaProduk, p
                             type="button"
                             onClick={() => {
                               setSelected(w); setQuery(w.label); setResults([]); setSearchLoading(false)
-                              if (currentStep === 2) {
+                              if (isStep2) {
                                 setCourierLoading(true)
                                 setCourierError(null)
                                 setCourierList([])
@@ -369,7 +370,7 @@ export function TransaksiChat({ whatsappNumber = '6281234567890', hargaProduk, p
                     max={maxQty}
                     value={quantity}
                     onChange={(e) => {
-                      if (currentStep === 2) {
+                      if (isStep2) {
                         setCourierLoading(true)
                         setCourierError(null)
                         setCourierList([])
