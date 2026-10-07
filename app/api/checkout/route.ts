@@ -1,174 +1,93 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase'
+import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-admin'
+import { verifyQuote } from '@/lib/quote'
+import { createSnapTransaction } from '@/lib/midtrans'
 
-export async function POST(request: NextRequest) {
+type HasilPesanan = { pesanan_id: string; nama_produk: string; harga_satuan: number; subtotal: number; total: number }
+
+const PESAN_RPC: Record<string, { status: number; pesan: string }> = {
+  STOK_TIDAK_CUKUP: { status: 409, pesan: 'Maaf, stok tidak mencukupi. Kurangi jumlah atau coba lagi nanti.' },
+  JUMLAH_TIDAK_VALID: { status: 400, pesan: 'Jumlah beli tidak valid.' },
+  WILAYAH_TIDAK_DITEMUKAN: { status: 400, pesan: 'Wilayah tujuan tidak valid. Pilih ulang.' },
+  ONGKIR_TIDAK_VALID: { status: 400, pesan: 'Ongkir tidak valid. Pilih ulang kurir.' },
+}
+
+function gagal(status: number, error: string) {
+  return NextResponse.json({ success: false, error }, { status })
+}
+
+function normalisasiHp(raw: string): string | null {
+  let d = raw.replace(/\D/g, '')
+  if (d.startsWith('0')) d = '62' + d.slice(1)
+  return /^628\d{8,11}$/.test(d) ? d : null
+}
+
+export async function POST(request: Request) {
+  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
+  if (!body) return gagal(400, 'Permintaan tidak valid.')
+
+  const produkId = String(body.produk_id ?? '')
+  const villageId = String(body.village_id ?? '')
+  const jumlah = Number(body.jumlah)
+  const nama = String(body.nama_pembeli ?? '').trim()
+  const alamat = String(body.alamat ?? '').trim()
+  const hp = normalisasiHp(String(body.no_hp ?? ''))
+  const quoteToken = String(body.quote ?? '')
+
+  if (!produkId || !villageId) return gagal(400, 'Data tidak lengkap.')
+  if (!Number.isInteger(jumlah) || jumlah < 1 || jumlah > 20) return gagal(400, 'Jumlah beli tidak valid.')
+  if (nama.length < 2 || nama.length > 100) return gagal(400, 'Nama tidak valid.')
+  if (alamat.length < 10 || alamat.length > 300) return gagal(400, 'Alamat lengkap minimal 10 karakter.')
+  if (!hp) return gagal(400, 'Nomor HP tidak valid. Contoh: 08123456789.')
+
+  // 1. Ongkir: wajib quote bertanda tangan dari /api/ongkir, dan harus cocok dengan data di DB
+  const quote = await verifyQuote(quoteToken)
+  if (!quote) return gagal(400, 'Pilihan kurir kedaluwarsa. Silakan pilih kurir lagi.')
+
+  const admin = createAdminClient()
+  const [{ data: produk }, { data: desa }] = await Promise.all([
+    admin.from('produk').select('berat_gram').eq('id', produkId).maybeSingle(),
+    admin.from('wilayah_cari').select('kode_pos').eq('desa_id', villageId).maybeSingle(),
+  ])
+  if (!produk || !desa) return gagal(404, 'Produk atau wilayah tidak ditemukan.')
+  if (quote.postal !== desa.kode_pos || quote.berat !== (produk.berat_gram ?? 0) * jumlah) {
+    return gagal(409, 'Data pengiriman berubah. Silakan pilih kurir lagi.')
+  }
+
+  // 2. Kurangi stok + buat pesanan dalam satu transaksi database (atomik)
+  const orderId = `ORD-${Date.now()}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`
+  const { data, error } = await admin.rpc('buat_pesanan', {
+    p_produk_id: produkId, p_jumlah: jumlah, p_nama: nama, p_no_hp: hp, p_alamat: alamat,
+    p_village_id: villageId, p_kurir_kode: quote.kurir, p_kurir_layanan: quote.layanan,
+    p_ongkir: quote.harga, p_midtrans_order_id: orderId, p_menit: 60,
+  })
+  if (error) {
+    const cocok = Object.entries(PESAN_RPC).find(([kode]) => error.message.includes(kode))
+    if (cocok) return gagal(cocok[1].status, cocok[1].pesan)
+    console.error('buat_pesanan gagal:', error.message)
+    return gagal(500, 'Checkout gagal. Coba lagi.')
+  }
+  const pesanan = data as HasilPesanan
+
+  // 3. Minta token Snap. Jika gagal, stok yang sudah ditahan langsung dikembalikan.
   try {
-    // 1. Check MIDTRANS_SERVER_KEY exists
-    if (!process.env.MIDTRANS_SERVER_KEY) {
-      return NextResponse.json(
-        { success: false, error: 'MIDTRANS_SERVER_KEY belum di-set, nih!' },
-        { status: 500 }
-      )
-    }
-
-    // 2. Parse request body
-    const body = await request.json()
-
-    // 3. Validate required fields
-    const requiredFields = [
-      'produk_id',
-      'nama_pembeli',
-      'no_hp',
-      'alamat',
-      'kurir_kode',
-      'kurir_layanan',
-      'ongkir',
-      'destination_area_id',
-      'district_id',
-      'district_name',
-      'city_name',
-      'province_name',
-      'postal_code',
-    ]
-    for (const field of requiredFields) {
-      const value = body[field]
-      if (value === undefined || value === null || (typeof value === 'string' && value.trim() === '')) {
-        return NextResponse.json(
-          { success: false, error: `${field} harus diisi ya!` },
-          { status: 400 }
-        )
-      }
-    }
-
-    // 3.1. Validate jumlah field
-    const jumlah = Math.round(Number(body.jumlah))
-    if (isNaN(jumlah) || jumlah < 1) {
-      return NextResponse.json(
-        { success: false, error: 'Jumlah harus berupa bilangan bulat positif!' },
-        { status: 400 }
-      )
-    }
-
-    // 4. Query Supabase table "produk"
-    const supabase = await createClient()
-    const { data: produkData, error: produkError } = await supabase
-      .from('produk')
-      .select('id, nama_produk, slug, harga_utama, harga_diskon, berat_gram')
-      .eq('id', body.produk_id)
-      .single()
-
-    if (produkError || !produkData) {
-      return NextResponse.json(
-        { success: false, error: 'Produk nggak ketemu, cek lagi ya!' },
-        { status: 404 }
-      )
-    }
-
-    const product = produkData
-
-    // 5. Calculate prices server-side
-    const harga_satuan = product.harga_diskon ?? product.harga_utama
-    const subtotal_produk = harga_satuan * jumlah
-    const ongkir_validated = Math.round(Number(body.ongkir) || 0)
-    const total_bayar = subtotal_produk + ongkir_validated
-
-    // 6. Generate unique order ID
-    const midtrans_order_id = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`
-
-    // 6.5. Enrich area details from Biteship if fields are missing
-    let district_name = body.district_name ?? null
-    let city_name = body.city_name ?? null
-    let province_name = body.province_name ?? null
-    let postal_code = body.postal_code ? String(body.postal_code) : null
-
-    const hasAreaGaps = !district_name || !city_name || !province_name || !postal_code
-
-    if (hasAreaGaps && body.district_id) {
-      try {
-        const areaRes = await fetch(
-          `https://api.biteship.com/v1/maps/areas?countries=ID&input=${encodeURIComponent(body.district_id)}&type=single`,
-          {
-            method: 'GET',
-            headers: {
-              Authorization: process.env.BITESHIP_API_KEY ?? '',
-              Accept: 'application/json',
-            },
-          }
-        )
-
-        if (areaRes.ok) {
-          const areaData = await areaRes.json()
-          if (areaData.success && Array.isArray(areaData.areas) && areaData.areas.length > 0) {
-            const area = areaData.areas[0]
-            district_name = district_name || area.administrative_division_level_3_name || null
-            city_name = city_name || area.administrative_division_level_2_name || null
-            province_name = province_name || area.administrative_division_level_1_name || null
-            postal_code = postal_code || (area.postal_code ? String(area.postal_code) : null)
-          }
-        }
-      } catch {
-        // Non-fatal: continue with whatever we have
-      }
-    }
-
-    // 6.6. Last-resort fallback: parse from area_name string format "District, City, Province. PostalCode"
-    if ((!district_name || !city_name || !province_name || !postal_code) && body.area_name) {
-      const match = body.area_name.match(/^(.+?),\s*(.+?),\s*(.+?)\.\s*(\d+)$/)
-      if (match) {
-        district_name = district_name || match[1].trim()
-        city_name = city_name || match[2].trim()
-        province_name = province_name || match[3].trim()
-        postal_code = postal_code || match[4].trim()
-      }
-    }
-
-    const district_id = String(body.district_id).trim()
-
-    // 7. Insert into Supabase table "pesanan"
-    const insertPayload = {
-      produk_id: body.produk_id,
-      nama_produk: product.nama_produk,
-      produk_slug: product.slug,
-      jumlah: jumlah,
-      nama_pembeli: body.nama_pembeli,
-      no_hp: body.no_hp,
-      alamat: body.alamat,
-      harga_satuan: harga_satuan,
-      subtotal_produk: subtotal_produk,
-      ongkir: ongkir_validated,
-      total_bayar: total_bayar,
-      kurir_kode: body.kurir_kode,
-      kurir_layanan: body.kurir_layanan,
-      district_id,
-      district_name,
-      city_name,
-      province_name,
-      postal_code,
-      midtrans_order_id: midtrans_order_id,
-      status: 'pending',
-    }
-
-    const adminSupabase = createAdminClient()
-    const { error: insertError } = await adminSupabase.from('pesanan').insert(insertPayload)
-
-    if (insertError) {
-      return NextResponse.json(
-        { success: false, error: insertError.message },
-        { status: 500 }
-      )
-    }
-
-    // 9. Return JSON
-    return NextResponse.json({
-      success: true,
-      order_id: midtrans_order_id,
+    const snap = await createSnapTransaction({
+      transaction_details: { order_id: orderId, gross_amount: Math.round(pesanan.total) },
+      item_details: [
+        { id: produkId.slice(0, 50), price: Math.round(pesanan.harga_satuan), quantity: jumlah, name: pesanan.nama_produk.slice(0, 50) },
+        { id: 'ONGKIR', price: Math.round(quote.harga), quantity: 1, name: `Ongkir ${quote.kurir.toUpperCase()} ${quote.layanan}`.slice(0, 50) },
+      ],
+      customer_details: {
+        first_name: nama.slice(0, 50), phone: hp,
+        shipping_address: { first_name: nama.slice(0, 50), phone: hp, address: alamat.slice(0, 200), postal_code: desa.kode_pos, country_code: 'IDN' },
+      },
+      expiry: { unit: 'minutes', duration: 60 },
     })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Terjadi error nggak dikenal, coba lagi nanti ya!'
-    return NextResponse.json(
-      { success: false, error: message },
-      { status: 500 }
-    )
+    await admin.from('pesanan').update({ snap_token: snap.token }).eq('id', pesanan.pesanan_id)
+    return NextResponse.json({ success: true, token: snap.token, order_id: orderId })
+  } catch (e) {
+    console.error('Snap gagal:', e)
+    await admin.rpc('update_status_pesanan', { p_order_id: orderId, p_status: 'cancelled' })
+    return gagal(502, 'Pembayaran belum dapat diproses. Coba lagi sebentar.')
   }
 }
