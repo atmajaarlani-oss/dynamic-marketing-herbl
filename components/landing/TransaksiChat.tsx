@@ -380,6 +380,9 @@ export function TransaksiChat({
       }
 
       const orderId = data.order_id ?? '';
+      if (!data.token) {
+        throw new Error('Token pembayaran tidak tersedia.')
+      }
       window.snap?.pay(data.token, {
         onSuccess: (_result: unknown) => {
           setLoading(false)
