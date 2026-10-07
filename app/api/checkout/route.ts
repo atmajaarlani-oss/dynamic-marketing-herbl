@@ -1,14 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase'
-import { createClient as createSupabaseAdmin } from '@supabase/supabase-js'
-import midtransClient from 'midtrans-client'
-
-function getAdminClient() {
-  return createSupabaseAdmin(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  )
-}
+import { createAdminClient } from '@/lib/supabase-admin'
 
 export async function POST(request: NextRequest) {
   try {
@@ -157,7 +149,7 @@ export async function POST(request: NextRequest) {
       status: 'pending',
     }
 
-    const adminSupabase = getAdminClient()
+    const adminSupabase = createAdminClient()
     const { error: insertError } = await adminSupabase.from('pesanan').insert(insertPayload)
 
     if (insertError) {
@@ -167,50 +159,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 8. Create Midtrans Snap transaction
-    const snap = new midtransClient.Snap({
-      isProduction: false,
-      serverKey: process.env.MIDTRANS_SERVER_KEY,
-    })
-
-    const snapResponse = await snap.createTransaction({
-      transaction_details: {
-        order_id: midtrans_order_id,
-        gross_amount: total_bayar,
-      },
-      customer_details: {
-        first_name: body.nama_pembeli,
-        phone: body.no_hp,
-      },
-    })
-
-    const snapToken = typeof snapResponse?.token === 'string' ? snapResponse.token.trim() : ''
-    if (!snapToken) {
-      console.error('[checkout] Midtrans returned an empty Snap token')
-      return NextResponse.json(
-        { success: false, error: 'Midtrans tidak mengembalikan token pembayaran.' },
-        { status: 502 },
-      )
-    }
-
-    // Simpan token yang sama agar pembayaran dapat dilanjutkan setelah popup ditutup.
-    const { error: tokenUpdateError } = await adminSupabase
-      .from('pesanan')
-      .update({ snap_token: snapToken })
-      .eq('midtrans_order_id', midtrans_order_id)
-
-    if (tokenUpdateError) {
-      console.error('[checkout] Failed to save Snap token', tokenUpdateError)
-      return NextResponse.json(
-        { success: false, error: 'Pembayaran dibuat, tetapi gagal menyiapkan pembayaran ulang.' },
-        { status: 500 },
-      )
-    }
-
     // 9. Return JSON
     return NextResponse.json({
       success: true,
-      token: snapToken,
       order_id: midtrans_order_id,
     })
   } catch (error) {
