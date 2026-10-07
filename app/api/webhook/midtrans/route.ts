@@ -2,7 +2,6 @@ import crypto from 'crypto'
 import { createClient as createSupabaseAdmin } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
-export const runtime = 'nodejs'
 
 function getAdminClient() {
   return createSupabaseAdmin(
