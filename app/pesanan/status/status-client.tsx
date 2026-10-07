@@ -59,7 +59,7 @@ export default function StatusClient({ orderId }: { orderId: string }) {
         setOrder(data)
         setLoading(false)
       })
-      .catch((err) => {
+      .catch(() => {
         if (!cancelled) {
           setError('Gagal terhubung ke server.')
           setLoading(false)
@@ -94,7 +94,7 @@ export default function StatusClient({ orderId }: { orderId: string }) {
           const data: OrderStatus = await res.json()
           setOrder(data)
         }
-      } catch (_err) {
+      } catch {
         // silent - keep polling
       }
     }, 5000)

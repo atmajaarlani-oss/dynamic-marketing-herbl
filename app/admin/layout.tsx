@@ -8,17 +8,20 @@ export const dynamic = "force-dynamic"
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
+  let user = null
+  let isAdmin = false
+  try {
+    const { data: { user: u } } = await supabase.auth.getUser()
+    user = u
+    isAdmin = user?.app_metadata?.role === "admin" || user?.app_metadata?.is_admin === true
+
+    if (!user || !isAdmin) {
+      await supabase.auth.signOut()
+      redirect("/admin-login?error=not_admin")
+    }
+  } catch {
     redirect("/admin-login")
-  }
-
-  const isAdmin = user.app_metadata?.role === "admin" || user.app_metadata?.is_admin === true
-
-  if (!isAdmin) {
-    await supabase.auth.signOut()
-    redirect("/admin-login?error=not_admin")
   }
 
   return (

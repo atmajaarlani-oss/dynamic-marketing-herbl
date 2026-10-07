@@ -6,6 +6,10 @@ import { cookies } from "next/headers"
  * Cookie session dibaca dari request saat ini.
  */
 export async function createClient() {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    throw new Error("Supabase URL/ANON_KEY belum diset")
+  }
+
   const cookieStore = await cookies()
 
   return createServerClient(

@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 
@@ -83,9 +84,11 @@ export default function ProdukList({ produk }: { produk: Produk[] }) {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         {p.gambar ? (
-                          <img
+                          <Image
                             src={p.gambar}
                             alt={p.nama_produk}
+                            width={40}
+                            height={40}
                             className="h-10 w-10 flex-none rounded-lg border border-border object-cover"
                           />
                         ) : (

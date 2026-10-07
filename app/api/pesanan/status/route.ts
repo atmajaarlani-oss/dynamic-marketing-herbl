@@ -47,7 +47,7 @@ export async function GET(request: Request) {
       tracking_link: data.catatan,
       created_at: new Date(data.created_at).toISOString(),
     })
-  } catch (err) {
+  } catch {
     return NextResponse.json({ error: 'Oops, something went wrong on our end.' }, { status: 500 })
   }
 }

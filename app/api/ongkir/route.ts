@@ -1,145 +1,94 @@
-import { NextResponse } from 'next/server';
+import { NextResponse } from 'next/server'
+import { createPublicClient } from '@/lib/supabase-public'
+import { signQuote } from '@/lib/quote'
 
-export const runtime = "nodejs"
-
-interface BiteshipPricingItem {
-  courier_code: string;
-  courier_name: string;
-  courier_service_name: string;
-  courier_service_code: string;
-  price: number;
-  duration: string;
+type BiteshipPricing = {
+  courier_code: string
+  courier_name: string
+  courier_service_name: string
+  courier_service_code: string
+  shipping_type: string
+  price: number
+  duration: string
 }
+type BiteshipRates = { success: boolean; pricing?: BiteshipPricing[] }
 
-interface BiteshipLocation {
-  location_id?: string | null;
-  latitude?: number | null;
-  longitude?: number | null;
-  postal_code?: number | string | null;
-  administrative_division_level_1_name?: string | null;
-  administrative_division_level_2_name?: string | null;
-  administrative_division_level_3_name?: string | null;
-  administrative_division_level_4_name?: string | null;
+const KURIR_DIIZINKAN = ['jne', 'jnt']
+const QUOTE_MENIT = 30
+
+function gagal(status: number, message: string) {
+  return NextResponse.json({ success: false, message }, { status })
 }
-
-interface BiteshipRateResponse {
-  success: boolean;
-  origin?: BiteshipLocation;
-  destination?: BiteshipLocation;
-  pricing: BiteshipPricingItem[];
-}
-
-interface OngkirResult {
-  courier_code: string;
-  service_code: string;
-  courier_name: string;
-  service: string;
-  harga: number;
-  estimasi: string;
-}
-
-const ALLOWED_COURIER_CODES = ['jne', 'jnt'];
 
 export async function POST(request: Request) {
-  try {
-    const body = await request.json();
-    const { destination_area_id, total_weight } = body;
-
-    if (!destination_area_id) {
-      return NextResponse.json(
-        { success: false, message: 'destination_area_id diperlukan' },
-        { status: 400 }
-      );
-    }
-
-    if (!total_weight || total_weight <= 0) {
-      return NextResponse.json(
-        { success: false, message: 'total_weight (gram) diperlukan' },
-        { status: 400 }
-      );
-    }
-
-    const originAreaId = process.env.BITESHIP_ORIGIN_AREA_ID;
-    if (!originAreaId) {
-      return NextResponse.json(
-        { success: false, message: 'BITESHIP_ORIGIN_AREA_ID tidak terkonfigurasi' },
-        { status: 500 }
-      );
-    }
-
-    const apiKey = process.env.BITESHIP_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json(
-        { success: false, message: 'BITESHIP_API_KEY tidak terkonfigurasi' },
-        { status: 500 }
-      );
-    }
-
-    const biteshipRes = await fetch('https://api.biteship.com/v1/rates/couriers', {
-      method: 'POST',
-      headers: {
-        Authorization: apiKey,
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify({
-        origin_area_id: originAreaId,
-        destination_area_id,
-        couriers: 'jne,jnt',
-        items: [
-          {
-            name: 'Produk',
-            value: 0,
-            weight: total_weight,
-            quantity: 1,
-          },
-        ],
-      }),
-    });
-
-    if (!biteshipRes.ok) {
-      const errBody = await biteshipRes.text();
-      return NextResponse.json(
-        {
-          success: false,
-          message: 'Gagal mengambil ongkir dari Biteship',
-          details: errBody,
-        },
-        { status: biteshipRes.status }
-      );
-    }
-
-    const data: BiteshipRateResponse = await biteshipRes.json();
-
-    if (!data.success || !Array.isArray(data.pricing)) {
-      return NextResponse.json(
-        { success: false, message: 'Format respons Biteship tidak dikenali', data },
-        { status: 502 }
-      );
-    }
-
-    const results: OngkirResult[] = data.pricing
-      .filter((item) => ALLOWED_COURIER_CODES.includes(item.courier_code))
-      .map((item) => ({
-        courier_code: item.courier_code,
-        service_code: item.courier_service_code,
-        courier_name: item.courier_name,
-        service: item.courier_service_name,
-        harga: item.price,
-        estimasi: item.duration,
-      }));
-
-    return NextResponse.json({
-      success: true,
-      data: results,
-      origin: data.origin ?? null,
-      destination: data.destination ?? null,
-    });
-  } catch (error) {
-    console.error('Error in /api/ongkir:', error);
-    return NextResponse.json(
-      { success: false, message: 'Internal server error' },
-      { status: 500 }
-    );
+  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
+  const produkId = String(body?.produk_id ?? '')
+  const villageId = String(body?.village_id ?? '')
+  const jumlah = Number(body?.jumlah)
+  if (!produkId || !villageId || !Number.isInteger(jumlah) || jumlah < 1 || jumlah > 20) {
+    return gagal(400, 'Data tidak lengkap.')
   }
+
+  const originPostal = process.env.BITESHIP_ORIGIN_POSTAL_CODE
+  const apiKey = process.env.BITESHIP_API_KEY
+  if (!originPostal || !apiKey) {
+    console.error('BITESHIP_ORIGIN_POSTAL_CODE / BITESHIP_API_KEY belum diset')
+    return gagal(500, 'Layanan ongkir belum dikonfigurasi.')
+  }
+
+  // Berat dan kode pos diambil dari DATABASE, bukan dari browser
+  const supabase = createPublicClient()
+  const [{ data: produk }, { data: desa }] = await Promise.all([
+    supabase.from('produk').select('berat_gram, stok').eq('id', produkId).eq('is_active', true).maybeSingle(),
+    supabase.from('wilayah_cari').select('kode_pos').eq('desa_id', villageId).maybeSingle(),
+  ])
+  if (!produk) return gagal(404, 'Produk tidak ditemukan.')
+  if (!desa) return gagal(404, 'Wilayah tidak ditemukan.')
+  if ((produk.stok ?? 0) < jumlah) return gagal(409, 'Stok tidak mencukupi.')
+  const berat = (produk.berat_gram ?? 0) * jumlah
+  if (berat <= 0) return gagal(422, 'Berat produk belum diisi.')
+
+  const res = await fetch('https://api.biteship.com/v1/rates/couriers', {
+    method: 'POST',
+    headers: { Authorization: apiKey, 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({
+      origin_postal_code: Number(originPostal),
+      destination_postal_code: Number(desa.kode_pos),
+      couriers: KURIR_DIIZINKAN.join(','),
+      items: [{ name: 'Produk', value: 0, weight: berat, quantity: 1 }],
+    }),
+    signal: AbortSignal.timeout(10000),
+  }).catch((e: unknown) => {
+    console.error('Biteship rates error:', e)
+    return null
+  })
+  if (!res || !res.ok) {
+    if (res) console.error('Biteship rates', res.status, await res.text())
+    return gagal(502, 'Gagal mengambil ongkir. Coba lagi sebentar.')
+  }
+
+  const json = (await res.json()) as BiteshipRates
+  // Hanya paket reguler: layanan 'freight' (mis. JNE Trucking, min. 10 kg) disaring
+  const daftar = (json.pricing ?? []).filter(
+    (p) => KURIR_DIIZINKAN.includes(p.courier_code) && p.shipping_type === 'parcel' && p.price > 0,
+  )
+
+  const exp = Date.now() + QUOTE_MENIT * 60 * 1000
+  const data = await Promise.all(
+    daftar
+      .sort((a, b) => a.price - b.price)
+      .map(async (p) => ({
+        courier_code: p.courier_code,
+        courier_name: p.courier_name,
+        service_code: p.courier_service_code,
+        service: p.courier_service_name,
+        harga: p.price,
+        estimasi: p.duration,
+        quote: await signQuote({
+          postal: desa.kode_pos, berat, kurir: p.courier_code, layanan: p.courier_service_code,
+          harga: p.price, estimasi: p.duration, exp,
+        }),
+      })),
+  )
+  return NextResponse.json({ success: true, data })
 }

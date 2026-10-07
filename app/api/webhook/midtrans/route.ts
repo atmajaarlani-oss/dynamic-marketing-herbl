@@ -1,270 +1,51 @@
-import crypto from 'crypto'
-import { createClient as createSupabaseAdmin } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { createAdminClient } from '@/lib/supabase-admin'
+import { sha512Hex, samaAman } from '@/lib/midtrans'
 
-export const runtime = 'nodejs'
-
-function getAdminClient() {
-  return createSupabaseAdmin(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
-
-function readRequiredEnv(name: string): string {
-  const value = process.env[name]
-  if (!value || value.trim() === '') {
-    throw new Error(`Missing required env var: ${name}`)
+function petakanStatus(trx: string, fraud: string): 'paid' | 'challenge' | 'cancelled' | 'expired' | null {
+  switch (trx) {
+    case 'capture': return fraud === 'accept' ? 'paid' : 'challenge'
+    case 'settlement': return 'paid'
+    case 'cancel': return 'cancelled'
+    case 'expire': return 'expired'
+    // 'deny' sengaja diabaikan: Snap masih mengizinkan pembeli mencoba lagi sampai kedaluwarsa.
+    // Stok dilepas oleh 'expire' (atau jaring pengaman pg_cron), bukan oleh 'deny'.
+    // 'pending' diabaikan: pesanan memang sudah berstatus pending.
+    default: return null
   }
-  return value
-}
-
-function readNumberEnv(name: string): number {
-  const raw = readRequiredEnv(name)
-  const n = Number(raw)
-  if (!Number.isFinite(n)) {
-    throw new Error(`Env var ${name} must be a number, got: ${raw}`)
-  }
-  return n
 }
 
 export async function POST(request: Request) {
-  console.log('Yo! Got your webhook.')
+  const body = (await request.json().catch(() => null)) as Record<string, string> | null
+  if (!body) return NextResponse.json({ error: 'Bad request' }, { status: 400 })
 
-  try {
-    const body = await request.json()
-
-    const {
-      order_id,
-      status_code,
-      gross_amount,
-      signature_key,
-      transaction_status,
-      fraud_status,
-    } = body
-
-    // STEP 1: Verify Midtrans signature (security - do this first)
-    const serverKey = process.env.MIDTRANS_SERVER_KEY ?? ''
-    const expectedSignature = crypto
-      .createHash('sha512')
-      .update(`${order_id}${status_code}${gross_amount}${serverKey}`)
-      .digest('hex')
-
-    if (expectedSignature !== signature_key) {
-      console.error('Webhook: invalid signature for order', order_id)
-      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
-    }
-
-    // STEP 2: Map Midtrans status to our status
-    let newStatus: string | null = null
-
-    if (transaction_status === 'capture') {
-      newStatus = fraud_status === 'accept' ? 'paid' : 'challenge'
-    } else if (transaction_status === 'settlement') {
-      newStatus = 'paid'
-    } else if (transaction_status === 'deny' || transaction_status === 'cancel') {
-      newStatus = 'cancelled'
-    } else if (transaction_status === 'expire') {
-      newStatus = 'expired'
-    } else if (transaction_status === 'pending') {
-      newStatus = 'pending'
-    }
-
-    if (!newStatus) {
-      return NextResponse.json({ message: 'Status not mapped, ignored' }, { status: 200 })
-    }
-
-    // STEP 3: Find the order in database
-    const supabase = getAdminClient()
-    const { data: pesanan, error: findError } = await supabase
-      .from('pesanan')
-      .select('id, status')
-      .eq('midtrans_order_id', order_id)
-      .single()
-
-    if (findError || !pesanan) {
-      console.error('Webhook: order not found', order_id)
-      // Return 200 anyway so Midtrans does not keep retrying for unknown orders
-      return NextResponse.json({ message: 'Order not found' }, { status: 200 })
-    }
-
-    // STEP 4: Idempotency check - do not reprocess already-paid orders
-    if (pesanan.status === 'paid') {
-      return NextResponse.json({ message: 'Already paid, skipped' }, { status: 200 })
-    }
-
-    // STEP 5: Update status
-    const { error: updateError } = await supabase
-      .from('pesanan')
-      .update({
-        status: newStatus,
-        midtrans_transaction_id: body.transaction_id ?? null,
-        metode_pembayaran: body.payment_type ?? null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('midtrans_order_id', order_id)
-
-    if (updateError) {
-      console.error('Webhook: failed to update status', updateError)
-      return NextResponse.json({ error: 'Database error' }, { status: 500 })
-    }
-
-    // STEP 6: Create Biteship order after successful payment
-    if (newStatus === 'paid') {
-      try {
-        // STEP 6: Fetch full order details for Biteship
-        const { data: fullPesanan, error: fullPesananError } = await supabase
-          .from('pesanan')
-          .select(
-            'id, nama_pembeli, no_hp, alamat, district_id, jumlah, kurir_kode, kurir_layanan, produk_id'
-          )
-          .eq('midtrans_order_id', order_id)
-          .limit(1)
-          .single()
-
-        if (fullPesananError || !fullPesanan) {
-          console.error('Biteship skipped: failed to fetch full pesanan', fullPesananError)
-          return NextResponse.json({ message: 'OK' }, { status: 200 })
-        }
-
-        if (!fullPesanan.district_id) {
-          console.warn(
-            `Biteship skipped: pesanan ${order_id} has no district_id`
-          )
-          return NextResponse.json({ message: 'OK' }, { status: 200 })
-        }
-
-        // STEP 7: Fetch product weight for Biteship items
-        let produk: { nama_produk: string | null; harga_diskon: number | null; berat_gram: number | null } | null = null
-        if (fullPesanan.produk_id) {
-          const { data: produkData, error: produkError } = await supabase
-            .from('produk')
-            .select('nama_produk, harga_diskon, berat_gram')
-            .eq('id', fullPesanan.produk_id)
-            .limit(1)
-            .single()
-
-          if (produkError) {
-            console.error('Biteship: failed to fetch produk', produkError)
-          } else {
-            produk = produkData
-          }
-        }
-
-        // STEP 8: Validate required Biteship origin env vars
-        // No more hardcoded "Herbal Insani" — fail loudly if env is missing.
-        let origin_contact_name: string
-        let origin_contact_phone: string
-        let origin_area_id: string
-        let origin_address: string
-        let origin_latitude: number
-        let origin_longitude: number
-        let apiKey: string
-        try {
-          origin_contact_name = readRequiredEnv('BITESHIP_ORIGIN_CONTACT_NAME')
-          origin_contact_phone = readRequiredEnv('BITESHIP_ORIGIN_CONTACT_PHONE')
-          origin_area_id = readRequiredEnv('BITESHIP_ORIGIN_AREA_ID')
-          origin_address = readRequiredEnv('BITESHIP_ORIGIN_ADDRESS')
-          origin_latitude = readNumberEnv('BITESHIP_ORIGIN_LATITUDE')
-          origin_longitude = readNumberEnv('BITESHIP_ORIGIN_LONGITUDE')
-          apiKey = readRequiredEnv('BITESHIP_API_KEY')
-        } catch (envErr) {
-          const msg = envErr instanceof Error ? envErr.message : 'Biteship env var missing'
-          console.error('Biteship skipped:', msg)
-          return NextResponse.json({ message: 'OK' }, { status: 200 })
-        }
-
-        // STEP 8.5: Debug log of Biteship origin config being used
-        // (Does NOT log BITESHIP_API_KEY)
-        console.log('Biteship origin config being used:', {
-          origin_contact_name,
-          origin_contact_phone,
-          origin_area_id,
-          origin_address,
-          origin_latitude,
-          origin_longitude,
-        })
-
-        // STEP 9: Create Biteship order with a bounded timeout so webhook retries remain safe.
-        const biteshipController = new AbortController()
-        const biteshipTimeout = setTimeout(() => biteshipController.abort(), 8000)
-        const biteshipRes = await fetch('https://api.biteship.com/v1/orders', {
-          method: 'POST',
-          headers: {
-            Authorization: apiKey,
-            'Content-Type': 'application/json',
-          },
-          signal: biteshipController.signal,
-          body: JSON.stringify({
-            origin_contact_name,
-            origin_contact_phone,
-            origin_area_id,
-            origin_address,
-            origin_coordinate: {
-              latitude: origin_latitude,
-              longitude: origin_longitude,
-            },
-            destination_contact_name: fullPesanan.nama_pembeli,
-            destination_contact_phone: fullPesanan.no_hp,
-            destination_address: fullPesanan.alamat,
-            destination_area_id: fullPesanan.district_id,
-            courier_company: fullPesanan.kurir_kode,
-            courier_type: fullPesanan.kurir_layanan,
-            delivery_type: 'now',
-            items: [
-              {
-                name: produk?.nama_produk ?? 'Produk',
-                value: Number(produk?.harga_diskon ?? 0),
-                weight: Number(produk?.berat_gram ?? 1000),
-                quantity: Number(fullPesanan.jumlah ?? 1),
-                length: 15,
-                width: 10,
-                height: 10,
-              },
-            ],
-          }),
-        })
-
-        const biteshipData = await biteshipRes.json()
-        clearTimeout(biteshipTimeout)
-        console.log('Biteship response status:', biteshipRes.status)
-        console.log('Biteship response data:', JSON.stringify(biteshipData, null, 2))
-
-        // STEP 10: If Biteship order creation succeeds, update pesanan record
-        if (biteshipData?.success === true) {
-          const { error: resiUpdateError } = await supabase
-            .from('pesanan')
-            .update({
-              resi: biteshipData.courier?.waybill_id ?? null,
-              catatan: biteshipData.courier?.link ?? null,
-            })
-            .eq('midtrans_order_id', order_id)
-
-          if (resiUpdateError) {
-            console.error(
-              'Biteship: failed to save waybill to pesanan (non-fatal)',
-              resiUpdateError
-            )
-          } else {
-            console.log(
-              'Biteship waybill saved:',
-              biteshipData.courier?.waybill_id
-            )
-          }
-        } else {
-          console.error('Biteship order failed (non-fatal):', biteshipData)
-        }
-      } catch (biteshipErr) {
-        // Biteship failure must NOT cause webhook to return non-200
-        console.error('Biteship order creation failed (non-fatal):', biteshipErr)
-      }
-    }
-
-    console.log(`Webhook: order ${order_id} updated to ${newStatus}`)
-    return NextResponse.json({ message: 'OK' }, { status: 200 })
-
-  } catch (err) {
-    console.error('Webhook: unexpected error', err)
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+  const serverKey = process.env.MIDTRANS_SERVER_KEY
+  if (!serverKey) {
+    console.error('Webhook: MIDTRANS_SERVER_KEY belum diset')
+    return NextResponse.json({ error: 'Server config' }, { status: 500 })
   }
+
+  // 1. Verifikasi tanda tangan Midtrans
+  const { order_id, status_code, gross_amount, signature_key, transaction_status, fraud_status, transaction_id } = body
+  const expected = await sha512Hex(`${order_id}${status_code}${gross_amount}${serverKey}`)
+  if (!samaAman(expected, String(signature_key ?? ''))) {
+    console.error('Webhook: signature tidak valid untuk', order_id)
+    return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+  }
+
+  // 2. Petakan status
+  const status = petakanStatus(transaction_status, fraud_status ?? '')
+  if (!status) return NextResponse.json({ message: 'Status diabaikan' }, { status: 200 })
+
+  // 3. Update atomik di database (service role). Idempoten: webhook ganda tidak merusak stok.
+  const { data, error } = await createAdminClient().rpc('update_status_pesanan', {
+    p_order_id: order_id, p_status: status, p_transaction_id: transaction_id ?? null, p_gross: Number(gross_amount),
+  })
+  if (error) {
+    console.error('Webhook: update gagal', error.message)
+    return NextResponse.json({ error: 'Database error' }, { status: 500 }) // Midtrans akan mencoba lagi
+  }
+  if (data === 'nominal_beda') console.error('Webhook: NOMINAL TIDAK COCOK untuk', order_id)
+  if (data === 'tidak_ada') console.error('Webhook: pesanan tidak ditemukan', order_id)
+  return NextResponse.json({ message: data }, { status: 200 })
 }
