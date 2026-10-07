@@ -24,6 +24,7 @@ type TransaksiChatProps = {
   hargaProduk?: number
   beratPerUnit?: number
   productId: string
+  stok?: number
 }
 
 interface CourierOption {
@@ -53,6 +54,7 @@ export function TransaksiChat({
   hargaProduk = 150000,
   beratPerUnit = 1000,
   productId,
+  stok = 0,
 }: TransaksiChatProps) {
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState<Step>(1)
