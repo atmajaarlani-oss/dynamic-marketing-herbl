@@ -54,11 +54,11 @@ export function Hero({
   }
 
   return (
-    <section className="w-full px-4 py-6 sm:px-6 sm:py-10 lg:px-8 lg:py-14" aria-labelledby="hero-heading">
-      <div className="mx-auto grid max-w-6xl items-center gap-8 overflow-hidden rounded-2xl bg-[#f3eee4] p-6 shadow-[0_16px_40px_rgba(63,73,48,0.12)] sm:p-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-12 lg:p-14">
+    <section className="w-full px-3 py-4 sm:px-6 sm:py-10 lg:px-8 lg:py-14" aria-labelledby="hero-heading">
+      <div className="mx-auto grid max-w-6xl items-center gap-5 overflow-hidden rounded-[1.75rem] bg-[#f3eee4] p-4 shadow-[0_16px_40px_rgba(63,73,48,0.12)] sm:gap-8 sm:rounded-[2rem] sm:p-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-12 lg:p-14">
         <div className="order-2 flex flex-col items-start lg:order-1">
           <span className="mb-4 inline-flex rounded-full bg-[#dce6d0] px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#35513a]">
-            Herbal + {namaProduk}
+            Herbal {namaProduk}
           </span>
           <h1 id="hero-heading" className="max-w-2xl text-pretty text-4xl font-bold leading-[1.08] tracking-tight text-[#26352a] sm:text-5xl lg:text-6xl">
             {painHeadline}
