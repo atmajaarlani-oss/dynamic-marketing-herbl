@@ -14,7 +14,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   try {
     const { data: { user: u } } = await supabase.auth.getUser()
     user = u
-    isAdmin = user.app_metadata?.role === "admin" || user.app_metadata?.is_admin === true
+    isAdmin = user?.app_metadata?.role === "admin" || user?.app_metadata?.is_admin === true
 
     if (!user || !isAdmin) {
       await supabase.auth.signOut()
