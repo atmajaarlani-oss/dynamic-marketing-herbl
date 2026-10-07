@@ -89,14 +89,11 @@ export function TransaksiChat({ whatsappNumber = '6281234567890', hargaProduk, p
   // Cari wilayah: ke database sendiri (tidak ada hit Biteship)
   useEffect(() => {
     const term = query.trim()
-    if (selected || term.length < 3) {
-      setResults([])
-      setSearchLoading(false)
-      return
-    }
+    if (selected) return
+    if (term.length < 3) return
     const controller = new AbortController()
-    setSearchLoading(true)
     const timer = setTimeout(() => {
+      setSearchLoading(true)
       fetch(`/api/wilayah/cari?q=${encodeURIComponent(term)}`, { signal: controller.signal })
         .then((res) => res.json())
         .then((d: { success: boolean; data?: Wilayah[] }) => setResults(d.success && d.data ? d.data : []))
@@ -110,10 +107,6 @@ export function TransaksiChat({ whatsappNumber = '6281234567890', hargaProduk, p
   useEffect(() => {
     if (currentStep !== 2 || !selected) return
     const controller = new AbortController()
-    setCourierLoading(true)
-    setCourierError(null)
-    setCourierList([])
-    setSelectedCourier(null)
 
     fetch('/api/ongkir', {
       method: 'POST',
@@ -138,6 +131,12 @@ export function TransaksiChat({ whatsappNumber = '6281234567890', hargaProduk, p
 
   const goToStep = (step: Step) => {
     setPesan(null)
+    if (step === 2) {
+      setCourierLoading(true)
+      setCourierError(null)
+      setCourierList([])
+      setSelectedCourier(null)
+    }
     setCurrentStep(step)
     formCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
@@ -303,7 +302,15 @@ export function TransaksiChat({ whatsappNumber = '6281234567890', hargaProduk, p
                     Cari Desa / Kelurahan / Kecamatan
                     <input
                       value={query}
-                      onChange={(e) => { setQuery(e.target.value); setSelected(null) }}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        if (val.trim().length < 3) {
+                          setResults([])
+                          setSearchLoading(false)
+                        }
+                        setQuery(val)
+                        setSelected(null)
+                      }}
                       placeholder="Contoh: Sukarasa Bandung"
                       autoComplete="off"
                       className={inputClass}
@@ -322,7 +329,15 @@ export function TransaksiChat({ whatsappNumber = '6281234567890', hargaProduk, p
                         <li key={w.desa_id}>
                           <button
                             type="button"
-                            onClick={() => { setSelected(w); setQuery(w.label); setResults([]) }}
+                            onClick={() => {
+                              setSelected(w); setQuery(w.label); setResults([]); setSearchLoading(false)
+                              if (currentStep === 2) {
+                                setCourierLoading(true)
+                                setCourierError(null)
+                                setCourierList([])
+                                setSelectedCourier(null)
+                              }
+                            }}
                             className="w-full px-4 py-3 text-left text-sm hover:bg-muted"
                           >
                             <span className="flex items-start gap-2">
@@ -353,7 +368,15 @@ export function TransaksiChat({ whatsappNumber = '6281234567890', hargaProduk, p
                     min={1}
                     max={maxQty}
                     value={quantity}
-                    onChange={(e) => setQuantity(Math.min(maxQty, Math.max(1, Math.floor(Number(e.target.value)) || 1)))}
+                    onChange={(e) => {
+                      if (currentStep === 2) {
+                        setCourierLoading(true)
+                        setCourierError(null)
+                        setCourierList([])
+                        setSelectedCourier(null)
+                      }
+                      setQuantity(Math.min(maxQty, Math.max(1, Math.floor(Number(e.target.value)) || 1)))
+                    }}
                     className={inputClass}
                   />
                 </label>
