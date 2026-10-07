@@ -14,7 +14,13 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const halaman = Math.max(1, Number((await searchParams).halaman) || 1)
   const from = (halaman - 1) * ITEMS_PER_PAGE
   const supabase = await createClient()
-  const { data: produkList, count, error } = await supabase.from("produk").select("slug, nama_produk, harga_utama, harga_diskon, gambar, indikasi", { count: "exact" }).eq("is_active", true).order("created_at", { ascending: false }).range(from, from + ITEMS_PER_PAGE - 1)
+  let produkList = null; let count = 0; let error = null
+  try {
+    const res = await supabase.from("produk").select("slug, nama_produk, harga_utama, harga_diskon, gambar, indikasi", { count: "exact" }).eq("is_active", true).order("created_at", { ascending: false }).range(from, from + ITEMS_PER_PAGE - 1)
+    produkList = res.data; count = res.count; error = res.error
+  } catch (e) {
+    error = e
+  }
   const products = produkList ?? []
   const totalPages = Math.max(1, Math.ceil((count ?? 0) / ITEMS_PER_PAGE))
 
