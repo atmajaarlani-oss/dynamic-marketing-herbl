@@ -8,7 +8,14 @@ export const dynamic = "force-dynamic"
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+
+  let user = null
+  try {
+    const { data: { user: u } } = await supabase.auth.getUser()
+    user = u
+  } catch {
+    redirect("/admin-login")
+  }
 
   if (!user) {
     redirect("/admin-login")
