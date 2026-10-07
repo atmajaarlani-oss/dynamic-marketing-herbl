@@ -32,6 +32,7 @@ Fitur utama:
 - Pembuatan order Biteship setelah pembayaran berhasil.
 - Panel admin untuk login dan CRUD produk.
 - Sitemap dan robots untuk SEO.
+- Gambar produk dirender melalui `next/image` dan memakai nilai pertama dari kolom `produk.gambar`.
 
 ## Teknologi
 
@@ -266,6 +267,25 @@ select
 from public.pesanan
 where midtrans_order_id = 'ORD-...';
 ```
+
+### Gambar produk tidak tampil
+
+Data produk dibaca dari tabel `public.produk`. Komponen memakai nilai pertama pada kolom `gambar`; jika nilainya kosong, UI memakai fallback `/icon.svg`. URL pada `gambar` harus dapat diakses oleh browser, misalnya URL publik Supabase Storage atau URL gambar HTTPS yang valid.
+
+Jika gambar berada di bucket Supabase Storage `multimedia`, periksa hal berikut:
+
+1. Nama bucket dan path file pada kolom `gambar` benar-benar cocok.
+2. Bucket atau objek memiliki izin baca publik yang sesuai untuk halaman katalog.
+3. Nilai `gambar` menyimpan URL lengkap, bukan hanya nama file, kecuali kode pemetaan URL memang sudah ditambahkan.
+4. Jalankan pemeriksaan aman berikut untuk melihat data tanpa mengambil isi file:
+
+```sql
+select id, slug, nama_produk, gambar, is_active
+from public.produk
+order by id;
+```
+
+Konfigurasi Next.js saat ini menggunakan `images.unoptimized`, sehingga URL remote tidak memerlukan `remotePatterns`; masalah gambar yang gagal biasanya berasal dari URL, path object, atau izin Storage.
 
 ### Webhook masuk tetapi Biteship gagal
 
