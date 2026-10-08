@@ -8,7 +8,6 @@ const supabase = createClient(
 )
 
 const BITESHIP_API_KEY = process.env.BITESHIP_API_KEY
-const MIDTRANS_SERVER_KEY = process.env.MIDTRANS_SERVER_KEY!
 const MIDTRANS_CLIENT_KEY =
   process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY ?? process.env.MIDTRANS_CLIENT_KEY!
 
