@@ -14,28 +14,6 @@ export default function ResumePage() {
   const [snapReady, setSnapReady] = useState(false)
   const [paying, setPaying] = useState(false)
 
-  const STORAGE_KEY = 'midtrans_resume_snap_token'
-
-  const loadStoredToken = (): string | null => {
-    if (typeof window === 'undefined') return null
-    const stored = sessionStorage.getItem(STORAGE_KEY)
-    if (!stored) return null
-    try {
-      const parsed = JSON.parse(stored)
-      if (parsed?.order_id === orderId && parsed?.snap_token) {
-        return parsed.snap_token
-      }
-    } catch {
-      // ignore parse error
-    }
-    return null
-  }
-
-  const saveStoredToken = (token: string): void => {
-    if (typeof window === 'undefined') return
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ order_id: orderId, snap_token: token }))
-  }
-
   useEffect(() => {
     if (!orderId) {
       Promise.resolve().then(() => {
@@ -45,11 +23,34 @@ export default function ResumePage() {
       return
     }
 
+    const STORAGE_KEY = 'midtrans_resume_snap_token'
+    const loadStoredToken = (): string | null => {
+      if (typeof window === 'undefined') return null
+      const stored = sessionStorage.getItem(STORAGE_KEY)
+      if (!stored) return null
+      try {
+        const parsed = JSON.parse(stored)
+        if (parsed?.order_id === orderId && parsed?.snap_token) {
+          return parsed.snap_token
+        }
+      } catch {
+        // ignore parse error
+      }
+      return null
+    }
+
+    const saveStoredToken = (token: string): void => {
+      if (typeof window === 'undefined') return
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ order_id: orderId, snap_token: token }))
+    }
+
     // Fallback: gunakan token yang tersimpan jika ada (persistensi sessionStorage)
     const stored = loadStoredToken()
     if (stored) {
-      setSnapToken(stored)
-      setLoading(false)
+      Promise.resolve().then(() => {
+        setSnapToken(stored)
+        setLoading(false)
+      })
       return
     }
 
@@ -76,8 +77,10 @@ export default function ResumePage() {
           // Jika fetch gagal tapi ada token tersimpan untuk orderId yang sama, gunakan token itu
           const stored = loadStoredToken()
           if (stored) {
-            setSnapToken(stored)
-            setError(null)
+            Promise.resolve().then(() => {
+              setSnapToken(stored)
+              setError(null)
+            })
           } else {
             setError(err.message)
           }
