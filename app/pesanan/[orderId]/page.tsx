@@ -33,6 +33,9 @@ export default function PesananDetailPage() {
   const [loading, setLoading] = useState(true)
 
   const fetchPesanan = useCallback(async () => {
+    setLoading(true)
+    setPesanan(null)
+    setBiteship(null)
     try {
       const res = await fetch(`/api/pesanan/status?order_id=${encodeURIComponent(orderId)}`)
       const data: PesananData = await res.json()
@@ -49,15 +52,6 @@ export default function PesananDetailPage() {
       console.error('Gagal mengambil data pesanan:', err)
     } finally {
       setLoading(false)
-    }
-  }, [orderId])
-
-  // Reset state saat orderId berubah agar data diperbarui
-  useEffect(() => {
-    if (pesanan !== null || !loading) {
-      setPesanan(null)
-      setBiteship(null)
-      setLoading(true)
     }
   }, [orderId])
 
