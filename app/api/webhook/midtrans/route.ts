@@ -23,7 +23,7 @@ function verifySignature(
 }
 
 export async function POST(request: Request) {
-  const body = (await request.json().catch(() => null)) as Record<string, any> | null
+  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
   if (!body) {
     return NextResponse.json({ error: 'Bad request' }, { status: 400 })
   }
@@ -100,6 +100,36 @@ export async function POST(request: Request) {
   }
 
   if (newStatus === 'paid' && !pesanan.biteship_order_id && BITESHIP_API_KEY) {
+    const originName = process.env.BITESHIP_ORIGIN_NAME
+    const originAddress = process.env.BITESHIP_ORIGIN_ADDRESS
+    const originPostalCode = process.env.BITESHIP_ORIGIN_POSTAL_CODE
+
+    if (!originName || !originAddress || !originPostalCode) {
+      console.error('Webhook: konfigurasi origin Biteship tidak lengkap')
+      return NextResponse.json({ error: 'Konfigurasi Biteship tidak lengkap' }, { status: 500 })
+    }
+
+    const biteshipPayload = {
+      origin_name: originName,
+      origin_address: originAddress,
+      origin_postal_code: originPostalCode,
+      destination_name: pesanan.nama_pembeli,
+      destination_address: pesanan.alamat ?? '',
+      destination_postal_code: pesanan.postal_code ?? '',
+      courier_company: 'jne',
+      courier_type: 'reg',
+      amount: Number(pesanan.total_bayar ?? 0),
+      items: [
+        {
+          id: pesanan.produk_id,
+          name: pesanan.nama_produk,
+          price: Number(pesanan.harga_satuan ?? 0),
+          quantity: Number(pesanan.jumlah ?? 1),
+          weight: 0,
+        },
+      ],
+    }
+
     try {
       const res = await fetch('https://api.biteship.com/v1/orders', {
         method: 'POST',
@@ -107,24 +137,8 @@ export async function POST(request: Request) {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${BITESHIP_API_KEY}`,
         },
-        body: JSON.stringify({
-          order_id: pesanan.midtrans_order_id,
-          customer_name: pesanan.nama_pembeli,
-          customer_phone: pesanan.no_hp,
-          items: [
-            {
-              id: pesanan.produk_id,
-              name: pesanan.nama_produk,
-              price: Number(pesanan.harga_satuan ?? 0),
-              quantity: Number(pesanan.jumlah ?? 1),
-            },
-          ],
-          total: Number(pesanan.total_bayar ?? 0),
-          shipping_address: {
-            address: pesanan.alamat ?? '',
-            postal_code: pesanan.postal_code ?? '',
-          },
-        }),
+        body: JSON.stringify(biteshipPayload),
+        signal: AbortSignal.timeout(10000),
       })
 
       const biteship = await res.json().catch(() => ({}))

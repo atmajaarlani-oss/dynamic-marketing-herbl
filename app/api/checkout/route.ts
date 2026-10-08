@@ -8,7 +8,6 @@ const supabase = createClient(
 )
 
 const BITESHIP_API_KEY = process.env.BITESHIP_API_KEY
-const MIDTRANS_SERVER_KEY = process.env.MIDTRANS_SERVER_KEY!
 const MIDTRANS_CLIENT_KEY =
   process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY ?? process.env.MIDTRANS_CLIENT_KEY!
 
@@ -24,7 +23,7 @@ function normalisasiHp(raw: string): string | null {
 }
 
 export async function POST(request: Request) {
-  const body = (await request.json().catch(() => null)) as Record<string, any> | null
+  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
   if (!body) return gagal(400, 'Permintaan tidak valid.')
 
   const produkId = String(body.produk_id ?? '').trim()
@@ -73,32 +72,42 @@ export async function POST(request: Request) {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${BITESHIP_API_KEY}`,
         },
+        signal: AbortSignal.timeout(10000),
         body: JSON.stringify({
           order_id: orderId,
-          customer_name: nama,
-          customer_phone: hp,
+          origin: {
+            contact_name: process.env.BITESHIP_ORIGIN_CONTACT_NAME ?? '',
+            contact_phone: process.env.BITESHIP_ORIGIN_CONTACT_PHONE ?? '',
+            address: process.env.BITESHIP_ORIGIN_ADDRESS ?? '',
+            postal_code: process.env.BITESHIP_ORIGIN_POSTAL_CODE ?? '',
+            area_id: process.env.BITESHIP_ORIGIN_AREA_ID ?? '',
+          },
+          destination: {
+            contact_name: nama,
+            contact_phone: hp,
+            address: alamat,
+            postal_code: Number(body.postal_code ?? ''),
+            area_id: villageId,
+          },
+          courier: {
+            company: kurirKode?.toLowerCase() || 'jne',
+            type: kurirLayanan?.toLowerCase() || 'regular',
+          },
+          amount: Math.round(totalBayar),
           items: [
             {
-              id: produk.id,
               name: produk.nama_produk,
-              price: Math.round(subtotalProduk),
+              value: Math.round(hargaJual),
               quantity: jumlah,
+              weight: (Number(produk.berat_gram ?? 0) || 0) * jumlah,
             },
           ],
-          total: Math.round(totalBayar),
-          shipping_address: {
-            address: alamat,
-            postal_code: body.postal_code ?? '',
-          },
         }),
       })
 
       if (biteshipRes.ok) {
         const biteshipData = await biteshipRes.json().catch(() => ({}))
-        biteshipOrderId =
-          typeof biteshipData?.id === 'string'
-            ? biteshipData.id
-            : biteshipData?.data?.id ?? null
+        biteshipOrderId = biteshipData.id || biteshipData.data?.id || null
       }
     } catch (e) {
       console.error('Biteship order gagal (non-fatal):', e)
@@ -136,12 +145,11 @@ export async function POST(request: Request) {
 
   const snap = new Midtrans.Snap({
     isProduction: false,
-    serverKey: MIDTRANS_SERVER_KEY,
     clientKey: MIDTRANS_CLIENT_KEY,
   })
 
   try {
-    const snapResponse = await snap.createTransaction({
+    const snapToken: string = await snap.createTransaction({
       transaction_details: {
         order_id: orderId,
         gross_amount: Math.round(totalBayar),
@@ -179,13 +187,13 @@ export async function POST(request: Request) {
 
     await supabase
       .from('pesanan')
-      .update({ snap_token: snapResponse.token })
+      .update({ snap_token: snapToken })
       .eq('id', pesanan.id)
 
     return NextResponse.json({
       success: true,
       order_id: orderId,
-      snap_token: snapResponse.token,
+      snap_token: snapToken,
       biteship_order_id: biteshipOrderId,
       total: Math.round(totalBayar),
     })

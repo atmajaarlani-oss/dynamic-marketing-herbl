@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import Midtrans from 'midtrans-client'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -8,7 +7,6 @@ const supabase = createClient(
 )
 
 const BITESHIP_API_KEY = process.env.BITESHIP_API_KEY
-const MIDTRANS_SERVER_KEY = process.env.MIDTRANS_SERVER_KEY!
 const MIDTRANS_CLIENT_KEY =
   process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY ?? process.env.MIDTRANS_CLIENT_KEY!
 
@@ -24,7 +22,7 @@ function normalisasiHp(raw: string): string | null {
 }
 
 export async function POST(request: Request) {
-  const body = (await request.json().catch(() => null)) as Record<string, any> | null
+  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
   if (!body) return gagal(400, 'Permintaan tidak valid.')
 
   const produkId = String(body.produk_id ?? '').trim()
@@ -136,12 +134,11 @@ export async function POST(request: Request) {
 
   const snap = new Midtrans.Snap({
     isProduction: false,
-    serverKey: MIDTRANS_SERVER_KEY,
     clientKey: MIDTRANS_CLIENT_KEY,
   })
 
   try {
-    const snapResponse = await snap.createTransaction({
+    const snapToken: string = await snap.createTransaction({
       transaction_details: {
         order_id: orderId,
         gross_amount: Math.round(totalBayar),
@@ -179,13 +176,13 @@ export async function POST(request: Request) {
 
     await supabase
       .from('pesanan')
-      .update({ snap_token: snapResponse.token })
+      .update({ snap_token: snapToken })
       .eq('id', pesanan.id)
 
     return NextResponse.json({
       success: true,
       order_id: orderId,
-      snap_token: snapResponse.token,
+      snap_token: snapToken,
       biteship_order_id: biteshipOrderId,
       total: Math.round(totalBayar),
     })
