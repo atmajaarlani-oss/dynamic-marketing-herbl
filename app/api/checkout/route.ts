@@ -24,7 +24,7 @@ function normalisasiHp(raw: string): string | null {
 }
 
 export async function POST(request: Request) {
-  const body = (await request.json().catch(() => null)) as Record<string, any> | null
+  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
   if (!body) return gagal(400, 'Permintaan tidak valid.')
 
   const produkId = String(body.produk_id ?? '').trim()
