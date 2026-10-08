@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   const { data, error } = await supabase
     .from('pesanan')
     .select('midtrans_order_id, snap_token, status, expires_at')
-    .eq('order_id', orderId)
+    .eq('midtrans_order_id', orderId)
     .maybeSingle()
 
   if (error || !data) {
