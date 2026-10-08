@@ -3,13 +3,30 @@ import { createClient } from '@supabase/supabase-js'
 import crypto from 'node:crypto'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
 const MIDTRANS_SERVER_KEY = process.env.MIDTRANS_SERVER_KEY!
-const BITESHIP_API_KEY = process.env.BITESHIP_API_KEY!
+const BITESHIP_API_KEY = process.env.BITESHIP_API_KEY
+
+function verifySignature(
+  orderId: string,
+  statusCode: string,
+  grossAmount: string,
+  serverKey: string,
+  signature: string
+) {
+  const expected = crypto
+    .createHash('sha512')
+    .update(`${orderId}${statusCode}${grossAmount}${serverKey}`)
+    .digest('hex')
+
+  return expected === String(signature ?? '')
+}
 
 export async function POST(request: Request) {
-  const body = (await request.json().catch(() => null)) as Record<string, string> | null
-  if (!body) return NextResponse.json({ error: 'Bad request' }, { status: 400 })
+  const body = (await request.json().catch(() => null)) as Record<string, any> | null
+  if (!body) {
+    return NextResponse.json({ error: 'Bad request' }, { status: 400 })
+  }
 
   const {
     order_id,
@@ -19,17 +36,23 @@ export async function POST(request: Request) {
     transaction_status,
   } = body
 
-  // 1. Verifikasi tanda tangan Midtrans
-  const expected = crypto
-    .createHash('sha512')
-    .update(`${order_id}${status_code}${gross_amount}${MIDTRANS_SERVER_KEY}`)
-    .digest('hex')
-  if (expected !== String(signature_key ?? '')) {
+  if (!order_id || !status_code || !gross_amount) {
+    return NextResponse.json({ error: 'Payload tidak lengkap' }, { status: 400 })
+  }
+
+  const valid = verifySignature(
+    String(order_id),
+    String(status_code),
+    String(gross_amount),
+    MIDTRANS_SERVER_KEY,
+    String(signature_key ?? '')
+  )
+
+  if (!valid) {
     console.error('Webhook: signature tidak valid untuk', order_id)
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   }
 
-  // 2. Petakan status
   let newStatus: 'paid' | 'pending' | 'cancelled' | 'expired' | null = null
   switch (transaction_status) {
     case 'capture':
@@ -48,32 +71,35 @@ export async function POST(request: Request) {
     default:
       newStatus = null
   }
-  if (!newStatus) return NextResponse.json({ message: 'Status diabaikan' }, { status: 200 })
 
-  // 3. Ambil pesanan
-  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  if (!newStatus) {
+    return NextResponse.json({ message: 'Status diabaikan' }, { status: 200 })
+  }
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
   const { data: pesanan, error: fetchError } = await supabase
     .from('pesanan')
     .select('*')
     .eq('midtrans_order_id', order_id)
-    .single()
+    .maybeSingle()
+
   if (fetchError || !pesanan) {
     console.error('Webhook: pesanan tidak ditemukan', order_id)
     return NextResponse.json({ error: 'Pesanan tidak ditemukan' }, { status: 404 })
   }
 
-  // 4. Update status
   const { error: updateError } = await supabase
     .from('pesanan')
     .update({ status: newStatus })
     .eq('id', pesanan.id)
+
   if (updateError) {
     console.error('Webhook: update gagal', updateError.message)
     return NextResponse.json({ error: 'Database error' }, { status: 500 })
   }
 
-  // 5. Fallback: buat order Biteship jika belum ada
-  if (newStatus === 'paid' && !pesanan.biteship_order_id) {
+  if (newStatus === 'paid' && !pesanan.biteship_order_id && BITESHIP_API_KEY) {
     try {
       const res = await fetch('https://api.biteship.com/v1/orders', {
         method: 'POST',
@@ -83,18 +109,30 @@ export async function POST(request: Request) {
         },
         body: JSON.stringify({
           order_id: pesanan.midtrans_order_id,
-          customer_name: pesanan.customer_name,
-          customer_email: pesanan.customer_email,
-          customer_phone: pesanan.customer_phone,
-          items: pesanan.items,
-          total: Number(pesanan.gross_amount),
+          customer_name: pesanan.nama_pembeli,
+          customer_phone: pesanan.no_hp,
+          items: [
+            {
+              id: pesanan.produk_id,
+              name: pesanan.nama_produk,
+              price: Number(pesanan.harga_satuan ?? 0),
+              quantity: Number(pesanan.jumlah ?? 1),
+            },
+          ],
+          total: Number(pesanan.total_bayar ?? 0),
+          shipping_address: {
+            address: pesanan.alamat ?? '',
+            postal_code: pesanan.postal_code ?? '',
+          },
         }),
       })
-      const biteship = await res.json()
-      if (res.ok && biteship.data?.id) {
+
+      const biteship = await res.json().catch(() => ({}))
+      if (res.ok && (biteship?.id || biteship?.data?.id)) {
+        const biteshipOrderId = biteship?.id ?? biteship?.data?.id
         await supabase
           .from('pesanan')
-          .update({ biteship_order_id: biteship.data.id })
+          .update({ biteship_order_id: String(biteshipOrderId) })
           .eq('id', pesanan.id)
       }
     } catch (err) {
