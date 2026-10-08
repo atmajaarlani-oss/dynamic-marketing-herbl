@@ -1,94 +1,201 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import Midtrans from 'midtrans-client'
 
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
+
+const BITESHIP_API_KEY = process.env.BITESHIP_API_KEY
+const MIDTRANS_SERVER_KEY = process.env.MIDTRANS_SERVER_KEY!
+const MIDTRANS_CLIENT_KEY =
+  process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY ?? process.env.MIDTRANS_CLIENT_KEY!
+
+function gagal(status: number, message: string) {
+  return NextResponse.json({ success: false, error: message }, { status })
+}
+
+function normalisasiHp(raw: string): string | null {
+  let d = raw.replace(/\D/g, '')
+  if (!d) return null
+  if (d.startsWith('0')) d = '62' + d.slice(1)
+  return /^628\d{8,11}$/.test(d) ? d : null
+}
 
 export async function POST(request: Request) {
-  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
-  const produkId = String(body?.produk_id ?? '')
-  const villageId = String(body?.village_id ?? '')
-  const jumlah = Number(body?.jumlah)
-  if (!produkId || !villageId || !Number.isInteger(jumlah) || jumlah < 1 || jumlah > 20) {
-    return NextResponse.json({ success: false, message: 'Data tidak lengkap.' }, { status: 400 })
+  const body = (await request.json().catch(() => null)) as Record<string, any> | null
+  if (!body) return gagal(400, 'Permintaan tidak valid.')
+
+  const produkId = String(body.produk_id ?? '').trim()
+  const villageId = String(body.village_id ?? '').trim()
+  const jumlah = Number(body.jumlah ?? 0)
+  const nama = String(body.nama_pembeli ?? '').trim()
+  const alamat = String(body.alamat ?? '').trim()
+  const hp = normalisasiHp(String(body.no_hp ?? ''))
+  const ongkir = Number(body.ongkir ?? 0)
+  const kurirKode = String(body.kurir_kode ?? '').trim()
+  const kurirLayanan = String(body.kurir_layanan ?? '').trim()
+
+  if (!produkId || !villageId) return gagal(400, 'Data tidak lengkap.')
+  if (!Number.isInteger(jumlah) || jumlah < 1 || jumlah > 20) {
+    return gagal(400, 'Jumlah beli tidak valid.')
   }
-
-  const originPostal = process.env.BITESHIP_ORIGIN_POSTAL_CODE
-  const apiKey = process.env.BITESHIP_API_KEY
-  if (!originPostal || !apiKey) {
-    console.error('BITESHIP_ORIGIN_POSTAL_CODE / BITESHIP_API_KEY belum diset')
-    return NextResponse.json({ success: false, message: 'Layanan ongkir belum dikonfigurasi.' }, { status: 500 })
+  if (nama.length < 2 || nama.length > 100) {
+    return gagal(400, 'Nama tidak valid.')
   }
+  if (alamat.length < 10 || alamat.length > 300) {
+    return gagal(400, 'Alamat lengkap minimal 10 karakter.')
+  }
+  if (!hp) return gagal(400, 'Nomor HP tidak valid. Contoh: 08123456789.')
 
-  const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!)
-
-  // Cek cache terlebih dahulu
-  const { data: cache } = await supabase
-    .from('ongkir_cache')
-    .select('*')
-    .eq('produk_id', produkId)
-    .eq('village_id', villageId)
-    .eq('jumlah', jumlah)
-    .gt('expires_at', new Date())
+  const { data: produk, error: produkError } = await supabase
+    .from('produk')
+    .select('id, slug, nama_produk, harga_utama, harga_diskon, stok, berat_gram')
+    .eq('id', produkId)
     .maybeSingle()
 
-  if (cache) {
-    return NextResponse.json({ success: true, data: cache.rates, source: 'cache' })
+  if (produkError || !produk) return gagal(404, 'Produk tidak ditemukan.')
+  if ((produk.stok ?? 0) < jumlah) return gagal(409, 'Maaf, stok tidak mencukupi.')
+
+  const hargaJual = Number(produk.harga_diskon ?? produk.harga_utama ?? 0)
+  const subtotalProduk = hargaJual * jumlah
+  const totalBayar = subtotalProduk + ongkir
+
+  const orderId = `ORD-${Date.now()}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`
+
+  let biteshipOrderId: string | null = null
+  if (BITESHIP_API_KEY) {
+    try {
+      const biteshipRes = await fetch('https://api.biteship.com/v1/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${BITESHIP_API_KEY}`,
+        },
+        body: JSON.stringify({
+          order_id: orderId,
+          customer_name: nama,
+          customer_phone: hp,
+          items: [
+            {
+              id: produk.id,
+              name: produk.nama_produk,
+              price: Math.round(subtotalProduk),
+              quantity: jumlah,
+            },
+          ],
+          total: Math.round(totalBayar),
+          shipping_address: {
+            address: alamat,
+            postal_code: body.postal_code ?? '',
+          },
+        }),
+      })
+
+      if (biteshipRes.ok) {
+        const biteshipData = await biteshipRes.json().catch(() => ({}))
+        biteshipOrderId =
+          typeof biteshipData?.id === 'string'
+            ? biteshipData.id
+            : biteshipData?.data?.id ?? null
+      }
+    } catch (e) {
+      console.error('Biteship order gagal (non-fatal):', e)
+    }
   }
 
-  // Cache miss: ambil data dari database
-  const [{ data: produk }, { data: desa }] = await Promise.all([
-    supabase.from('produk').select('berat_gram, stok').eq('id', produkId).eq('is_active', true).maybeSingle(),
-    supabase.from('wilayah_cari').select('kode_pos').eq('desa_id', villageId).maybeSingle(),
-  ])
-  if (!produk) return NextResponse.json({ success: false, message: 'Produk tidak ditemukan.' }, { status: 404 })
-  if (!desa) return NextResponse.json({ success: false, message: 'Wilayah tidak ditemukan.' }, { status: 404 })
-  if ((produk.stok ?? 0) < jumlah) return NextResponse.json({ success: false, message: 'Stok tidak mencukupi.' }, { status: 409 })
-  const berat = (produk.berat_gram ?? 0) * jumlah
-  if (berat <= 0) return NextResponse.json({ success: false, message: 'Berat produk belum diisi.' }, { status: 422 })
+  const { data: pesanan, error: insertError } = await supabase
+    .from('pesanan')
+    .insert({
+      nama_pembeli: nama,
+      no_hp: hp,
+      alamat: alamat,
+      produk_id: produkId,
+      produk_slug: produk.slug,
+      nama_produk: produk.nama_produk,
+      village_id: villageId,
+      jumlah,
+      harga_satuan: hargaJual,
+      subtotal_produk: subtotalProduk,
+      ongkir,
+      total_bayar: totalBayar,
+      kurir_kode: kurirKode || null,
+      kurir_layanan: kurirLayanan || null,
+      status: 'pending',
+      midtrans_order_id: orderId,
+      biteship_order_id: biteshipOrderId,
+    })
+    .select()
+    .single()
 
-  // Hit Biteship
-  const res = await fetch('https://api.biteship.com/v1/rates', {
-    method: 'POST',
-    headers: { Authorization: apiKey, 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({
-      origin_postal_code: Number(originPostal),
-      destination_postal_code: Number(desa.kode_pos),
-      couriers: 'jne,jnt',
-      items: [{ name: 'Produk', value: 0, weight: berat, quantity: 1 }],
-    }),
-    signal: AbortSignal.timeout(10000),
-  }).catch((e: unknown) => {
-    console.error('Biteship rates error:', e)
-    return null
-  })
-  if (!res || !res.ok) {
-    if (res) console.error('Biteship rates', res.status, await res.text())
-    return NextResponse.json({ success: false, message: 'Gagal mengambil ongkir. Coba lagi sebentar.' }, { status: 502 })
+  if (insertError || !pesanan) {
+    console.error('Insert pesanan gagal:', insertError)
+    return gagal(500, 'Checkout gagal. Coba lagi.')
   }
 
-  const json = await res.json() as { success: boolean; pricing?: { courier_code: string; courier_name: string; courier_service_name: string; courier_service_code: string; shipping_type: string; price: number; duration: string }[] }
-  const daftar = (json.pricing ?? []).filter(
-    (p) => ['jne', 'jnt'].includes(p.courier_code) && p.shipping_type === 'parcel' && p.price > 0,
-  )
-
-  const rates = daftar.map((p) => ({
-    courier_code: p.courier_code,
-    courier_name: p.courier_name,
-    service_code: p.courier_service_code,
-    service: p.courier_service_name,
-    harga: p.price,
-    estimasi: p.duration,
-  }))
-
-  // Simpan ke cache
-  await supabase.from('ongkir_cache').insert({
-    produk_id: produkId,
-    village_id: villageId,
-    jumlah,
-    berat,
-    rates,
-    expires_at: new Date(Date.now() + CACHE_TTL_MS),
+  const snap = new Midtrans.Snap({
+    isProduction: false,
+    serverKey: MIDTRANS_SERVER_KEY,
+    clientKey: MIDTRANS_CLIENT_KEY,
   })
 
-  return NextResponse.json({ success: true, data: rates, source: 'api' })
+  try {
+    const snapResponse = await snap.createTransaction({
+      transaction_details: {
+        order_id: orderId,
+        gross_amount: Math.round(totalBayar),
+      },
+      item_details: [
+        {
+          id: produkId,
+          name: produk.nama_produk,
+          price: Math.round(hargaJual),
+          quantity: jumlah,
+        },
+        {
+          id: 'ONGKIR',
+          name: 'Ongkos Kirim',
+          price: Math.round(ongkir),
+          quantity: 1,
+        },
+      ],
+      customer_details: {
+        first_name: nama.slice(0, 50),
+        phone: hp,
+        shipping_address: {
+          first_name: nama.slice(0, 50),
+          phone: hp,
+          address: alamat.slice(0, 200),
+          postal_code: String(body.postal_code ?? ''),
+          country_code: 'IDN',
+        },
+      },
+      expiry: {
+        unit: 'minutes',
+        duration: 60,
+      },
+    })
+
+    await supabase
+      .from('pesanan')
+      .update({ snap_token: snapResponse.token })
+      .eq('id', pesanan.id)
+
+    return NextResponse.json({
+      success: true,
+      order_id: orderId,
+      snap_token: snapResponse.token,
+      biteship_order_id: biteshipOrderId,
+      total: Math.round(totalBayar),
+    })
+  } catch (e) {
+    console.error('Snap gagal:', e)
+    await supabase
+      .from('pesanan')
+      .update({ status: 'cancelled' })
+      .eq('id', pesanan.id)
+
+    return gagal(502, 'Pembayaran belum dapat diproses. Coba lagi sebentar.')
+  }
 }
