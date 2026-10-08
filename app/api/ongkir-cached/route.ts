@@ -136,12 +136,11 @@ export async function POST(request: Request) {
 
   const snap = new Midtrans.Snap({
     isProduction: false,
-    serverKey: MIDTRANS_SERVER_KEY,
     clientKey: MIDTRANS_CLIENT_KEY,
   })
 
   try {
-    const snapResponse = await snap.createTransaction({
+    const snapResponse: { token: string } = await snap.createTransaction({
       transaction_details: {
         order_id: orderId,
         gross_amount: Math.round(totalBayar),

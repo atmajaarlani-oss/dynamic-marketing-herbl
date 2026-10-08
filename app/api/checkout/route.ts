@@ -77,11 +77,11 @@ export async function POST(request: Request) {
         body: JSON.stringify({
           order_id: orderId,
           origin: {
-            contact_name: BITESHIP_ORIGIN_CONTACT_NAME,
-            contact_phone: BITESHIP_ORIGIN_CONTACT_PHONE,
-            address: BITESHIP_ORIGIN_ADDRESS,
-            postal_code: BITESHIP_ORIGIN_POSTAL_CODE,
-            area_id: BITESHIP_ORIGIN_AREA_ID,
+            contact_name: process.env.BITESHIP_ORIGIN_CONTACT_NAME ?? '',
+            contact_phone: process.env.BITESHIP_ORIGIN_CONTACT_PHONE ?? '',
+            address: process.env.BITESHIP_ORIGIN_ADDRESS ?? '',
+            postal_code: process.env.BITESHIP_ORIGIN_POSTAL_CODE ?? '',
+            area_id: process.env.BITESHIP_ORIGIN_AREA_ID ?? '',
           },
           destination: {
             contact_name: nama,
@@ -146,12 +146,11 @@ export async function POST(request: Request) {
 
   const snap = new Midtrans.Snap({
     isProduction: false,
-    serverKey: MIDTRANS_SERVER_KEY,
     clientKey: MIDTRANS_CLIENT_KEY,
   })
 
   try {
-    const snapResponse = await snap.createTransaction({
+    const snapResponse: { token: string } = await snap.createTransaction({
       transaction_details: {
         order_id: orderId,
         gross_amount: Math.round(totalBayar),
