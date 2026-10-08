@@ -23,7 +23,7 @@ function verifySignature(
 }
 
 export async function POST(request: Request) {
-  const body = (await request.json().catch(() => null)) as Record<string, any> | null
+  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
   if (!body) {
     return NextResponse.json({ error: 'Bad request' }, { status: 400 })
   }
