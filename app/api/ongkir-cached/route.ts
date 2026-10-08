@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000
 
 export async function POST(request: Request) {
-  const body = (await request.json().catch(() => null)) as Record<string, any> | null
+  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
   if (!body) {
     return NextResponse.json(
       { success: false, message: 'Permintaan tidak valid.' },
