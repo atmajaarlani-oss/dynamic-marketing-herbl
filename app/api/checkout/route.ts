@@ -73,32 +73,42 @@ export async function POST(request: Request) {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${BITESHIP_API_KEY}`,
         },
+        signal: AbortSignal.timeout(10000),
         body: JSON.stringify({
           order_id: orderId,
-          customer_name: nama,
-          customer_phone: hp,
+          origin: {
+            contact_name: BITESHIP_ORIGIN_CONTACT_NAME,
+            contact_phone: BITESHIP_ORIGIN_CONTACT_PHONE,
+            address: BITESHIP_ORIGIN_ADDRESS,
+            postal_code: BITESHIP_ORIGIN_POSTAL_CODE,
+            area_id: BITESHIP_ORIGIN_AREA_ID,
+          },
+          destination: {
+            contact_name: nama,
+            contact_phone: hp,
+            address: alamat,
+            postal_code: Number(body.postal_code ?? ''),
+            area_id: villageId,
+          },
+          courier: {
+            company: kurirKode?.toLowerCase() || 'jne',
+            type: kurirLayanan?.toLowerCase() || 'regular',
+          },
+          amount: Math.round(totalBayar),
           items: [
             {
-              id: produk.id,
               name: produk.nama_produk,
-              price: Math.round(subtotalProduk),
+              value: Math.round(hargaJual),
               quantity: jumlah,
+              weight: (Number(produk.berat_gram ?? 0) || 0) * jumlah,
             },
           ],
-          total: Math.round(totalBayar),
-          shipping_address: {
-            address: alamat,
-            postal_code: body.postal_code ?? '',
-          },
         }),
       })
 
       if (biteshipRes.ok) {
         const biteshipData = await biteshipRes.json().catch(() => ({}))
-        biteshipOrderId =
-          typeof biteshipData?.id === 'string'
-            ? biteshipData.id
-            : biteshipData?.data?.id ?? null
+        biteshipOrderId = biteshipData.id || biteshipData.data?.id || null
       }
     } catch (e) {
       console.error('Biteship order gagal (non-fatal):', e)
