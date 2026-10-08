@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import Midtrans from 'midtrans-client'
+import { createSnapTransaction } from '../../../lib/midtrans'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -143,17 +143,9 @@ export async function POST(request: Request) {
     return gagal(500, 'Checkout gagal. Coba lagi.')
   }
 
-  const snap = new Midtrans.Snap({
-    isProduction: false,
-    clientKey: MIDTRANS_CLIENT_KEY,
-  })
-
   try {
-    const snapToken: string = await snap.createTransaction({
-      transaction_details: {
-        order_id: orderId,
-        gross_amount: Math.round(totalBayar),
-      },
+    const { token: snapToken } = await createSnapTransaction({
+      transaction_details: { order_id: orderId, gross_amount: Math.round(totalBayar) },
       item_details: [
         {
           id: produkId,
