@@ -8,8 +8,6 @@ const supabase = createClient(
 )
 
 const BITESHIP_API_KEY = process.env.BITESHIP_API_KEY
-const MIDTRANS_CLIENT_KEY =
-  process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY ?? process.env.MIDTRANS_CLIENT_KEY!
 
 function gagal(status: number, message: string) {
   return NextResponse.json({ success: false, error: message }, { status })
