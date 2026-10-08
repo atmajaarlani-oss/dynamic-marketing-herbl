@@ -139,7 +139,7 @@ export async function POST(request: Request) {
   })
 
   try {
-    const snapResponse: { token: string } = await snap.createTransaction({
+    const snapToken: string = await snap.createTransaction({
       transaction_details: {
         order_id: orderId,
         gross_amount: Math.round(totalBayar),
@@ -177,13 +177,13 @@ export async function POST(request: Request) {
 
     await supabase
       .from('pesanan')
-      .update({ snap_token: snapResponse.token })
+      .update({ snap_token: snapToken })
       .eq('id', pesanan.id)
 
     return NextResponse.json({
       success: true,
       order_id: orderId,
-      snap_token: snapResponse.token,
+      snap_token: snapToken,
       biteship_order_id: biteshipOrderId,
       total: Math.round(totalBayar),
     })
