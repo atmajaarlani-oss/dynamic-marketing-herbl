@@ -1,16 +1,13 @@
 import { NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase-admin'
-import { verifyQuote } from '@/lib/quote'
-import { createSnapTransaction } from '@/lib/midtrans'
+import { createClient } from '@supabase/supabase-js'
+import Midtrans from 'midtrans-client'
 
-type HasilPesanan = { pesanan_id: string; nama_produk: string; harga_satuan: number; subtotal: number; total: number }
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-const PESAN_RPC: Record<string, { status: number; pesan: string }> = {
-  STOK_TIDAK_CUKUP: { status: 409, pesan: 'Maaf, stok tidak mencukupi. Kurangi jumlah atau coba lagi nanti.' },
-  JUMLAH_TIDAK_VALID: { status: 400, pesan: 'Jumlah beli tidak valid.' },
-  WILAYAH_TIDAK_DITEMUKAN: { status: 400, pesan: 'Wilayah tujuan tidak valid. Pilih ulang.' },
-  ONGKIR_TIDAK_VALID: { status: 400, pesan: 'Ongkir tidak valid. Pilih ulang kurir.' },
-}
+const BiteshipApiKey = process.env.BITESHIP_API_KEY!
+
 
 function gagal(status: number, error: string) {
   return NextResponse.json({ success: false, error }, { status })
@@ -32,7 +29,6 @@ export async function POST(request: Request) {
   const nama = String(body.nama_pembeli ?? '').trim()
   const alamat = String(body.alamat ?? '').trim()
   const hp = normalisasiHp(String(body.no_hp ?? ''))
-  const quoteToken = String(body.quote ?? '')
 
   if (!produkId || !villageId) return gagal(400, 'Data tidak lengkap.')
   if (!Number.isInteger(jumlah) || jumlah < 1 || jumlah > 20) return gagal(400, 'Jumlah beli tidak valid.')
@@ -40,54 +36,116 @@ export async function POST(request: Request) {
   if (alamat.length < 10 || alamat.length > 300) return gagal(400, 'Alamat lengkap minimal 10 karakter.')
   if (!hp) return gagal(400, 'Nomor HP tidak valid. Contoh: 08123456789.')
 
-  // 1. Ongkir: wajib quote bertanda tangan dari /api/ongkir, dan harus cocok dengan data di DB
-  const quote = await verifyQuote(quoteToken)
-  if (!quote) return gagal(400, 'Pilihan kurir kedaluwarsa. Silakan pilih kurir lagi.')
+  // 1. Validasi produk dari DB dan hitung subtotal/total server-side
+  const { data: produk, error: produkError } = await supabase
+    .from('produk')
+    .select('id, nama, harga_satuan, berat_gram, stok')
+    .eq('id', produkId)
+    .maybeSingle()
+  if (produkError || !produk) return gagal(404, 'Produk tidak ditemukan.')
+  if (produk.stok < jumlah) return gagal(409, 'Maaf, stok tidak mencukupi.')
 
-  const admin = createAdminClient()
-  const [{ data: produk }, { data: desa }] = await Promise.all([
-    admin.from('produk').select('berat_gram').eq('id', produkId).maybeSingle(),
-    admin.from('wilayah_cari').select('kode_pos').eq('desa_id', villageId).maybeSingle(),
-  ])
-  if (!produk || !desa) return gagal(404, 'Produk atau wilayah tidak ditemukan.')
-  if (quote.postal !== desa.kode_pos || quote.berat !== (produk.berat_gram ?? 0) * jumlah) {
-    return gagal(409, 'Data pengiriman berubah. Silakan pilih kurir lagi.')
+  const subtotal = produk.harga_satuan * jumlah
+  const total = subtotal
+
+  // 2. Buat order Biteship sebelum insert DB (non-fatal jika gagal)
+  const orderId = `ORD-${Date.now()}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`
+  let biteshipOrderId: string | null = null
+  try {
+    const biteshipRes = await fetch('https://api.biteship.com/v1/orders', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${BiteshipApiKey}`,
+      },
+      body: JSON.stringify({
+        order_id: orderId,
+        items: [
+          {
+            id: produkId.slice(0, 50),
+            name: produk.nama.slice(0, 100),
+            price: Math.round(subtotal),
+            quantity: jumlah,
+          },
+        ],
+        shipping_address: {
+          first_name: nama.slice(0, 50),
+          phone: hp,
+          address: alamat.slice(0, 200),
+          postal_code: '',
+          country_code: 'IDN',
+        },
+      }),
+    })
+    if (biteshipRes.ok) {
+      const biteshipData = await biteshipRes.json()
+      biteshipOrderId = String((biteshipData as Record<string, unknown>).id ?? null) as string | null
+    }
+  } catch (e) {
+    console.error('Biteship order gagal (non-fatal):', e)
   }
 
-  // 2. Kurangi stok + buat pesanan dalam satu transaksi database (atomik)
-  const orderId = `ORD-${Date.now()}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`
-  const { data, error } = await admin.rpc('buat_pesanan', {
-    p_produk_id: produkId, p_jumlah: jumlah, p_nama: nama, p_no_hp: hp, p_alamat: alamat,
-    p_village_id: villageId, p_kurir_kode: quote.kurir, p_kurir_layanan: quote.layanan,
-    p_ongkir: quote.harga, p_midtrans_order_id: orderId, p_menit: 60,
-  })
-  if (error) {
-    const cocok = Object.entries(PESAN_RPC).find(([kode]) => error.message.includes(kode))
-    if (cocok) return gagal(cocok[1].status, cocok[1].pesan)
-    console.error('buat_pesanan gagal:', error.message)
+  // 3. Insert pesanan ke DB
+  const { data: pesanan, error: insertError } = await supabase
+    .from('pesanan')
+    .insert({
+      pesanan_id: orderId,
+      produk_id: produkId,
+      village_id: villageId,
+      jumlah: jumlah,
+      nama_pembeli: nama,
+      no_hp: hp,
+      alamat: alamat,
+      subtotal: Math.round(subtotal),
+      total: Math.round(total),
+      midtrans_order_id: orderId,
+      biteship_order_id: biteshipOrderId,
+      status: 'pending',
+      cached_at: new Date().toISOString(),
+    })
+    .select()
+    .maybeSingle()
+  if (insertError || !pesanan) {
+    console.error('Insert pesanan gagal:', insertError)
     return gagal(500, 'Checkout gagal. Coba lagi.')
   }
-  const pesanan = data as HasilPesanan
 
-  // 3. Minta token Snap. Jika gagal, stok yang sudah ditahan langsung dikembalikan.
+  // 4. Buat Snap dan simpan token ke DB
+  const snap = new Midtrans.Snap({
+    isProduction: false,
+    clientKey: process.env.MIDTRANS_CLIENT_KEY!,
+  })
   try {
-    const snap = await createSnapTransaction({
-      transaction_details: { order_id: orderId, gross_amount: Math.round(pesanan.total) },
+    const snapToken = await snap.createTransaction({
+      transaction_details: { order_id: orderId, gross_amount: Math.round(total) },
       item_details: [
-        { id: produkId.slice(0, 50), price: Math.round(pesanan.harga_satuan), quantity: jumlah, name: pesanan.nama_produk.slice(0, 50) },
-        { id: 'ONGKIR', price: Math.round(quote.harga), quantity: 1, name: `Ongkir ${quote.kurir.toUpperCase()} ${quote.layanan}`.slice(0, 50) },
+        { id: produkId.slice(0, 50), price: Math.round(subtotal), quantity: jumlah, name: produk.nama.slice(0, 50) },
+        { id: 'ONGKIR', price: 0, quantity: 1, name: 'Ongkos Kirim' },
       ],
       customer_details: {
-        first_name: nama.slice(0, 50), phone: hp,
-        shipping_address: { first_name: nama.slice(0, 50), phone: hp, address: alamat.slice(0, 200), postal_code: desa.kode_pos, country_code: 'IDN' },
+        first_name: nama.slice(0, 50),
+        phone: hp,
+        shipping_address: {
+          first_name: nama.slice(0, 50),
+          phone: hp,
+          address: alamat.slice(0, 200),
+          postal_code: '',
+          country_code: 'IDN',
+        },
       },
       expiry: { unit: 'minutes', duration: 60 },
     })
-    await admin.from('pesanan').update({ snap_token: snap.token }).eq('id', pesanan.pesanan_id)
-    return NextResponse.json({ success: true, token: snap.token, order_id: orderId })
+    await supabase.from('pesanan').update({ snap_token: snapToken }).eq('pesanan_id', pesanan.pesanan_id)
+    return NextResponse.json({
+      success: true,
+      order_id: orderId,
+      snap_token: snapToken,
+      biteship_order_id: biteshipOrderId,
+      total: Math.round(total),
+    })
   } catch (e) {
     console.error('Snap gagal:', e)
-    await admin.rpc('update_status_pesanan', { p_order_id: orderId, p_status: 'cancelled' })
+    await supabase.from('pesanan').update({ status: 'cancelled' }).eq('pesanan_id', pesanan.pesanan_id)
     return gagal(502, 'Pembayaran belum dapat diproses. Coba lagi sebentar.')
   }
 }
