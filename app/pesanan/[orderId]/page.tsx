@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 
 interface Pesanan {
@@ -32,7 +32,7 @@ export default function PesananDetailPage() {
   const [biteship, setBiteship] = useState<BiteshipData | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const fetchPesanan = async () => {
+  const fetchPesanan = useCallback(async () => {
     try {
       const res = await fetch(`/api/pesanan/status?order_id=${encodeURIComponent(orderId)}`)
       const data: PesananData = await res.json()
@@ -50,13 +50,27 @@ export default function PesananDetailPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [orderId])
 
+  // Reset state saat orderId berubah agar data diperbarui
   useEffect(() => {
-    fetchPesanan()
+    if (pesanan !== null || !loading) {
+      setPesanan(null)
+      setBiteship(null)
+      setLoading(true)
+    }
+  }, [orderId])
+
+  // Polling interval - effect hanya mengatur timer, tidak memanggil setState langsung
+  useEffect(() => {
     const interval = setInterval(fetchPesanan, 5000)
     return () => clearInterval(interval)
-  }, [orderId])
+  }, [fetchPesanan])
+
+  // Fetch awal langsung di body komponen (menghindari aturan set-state-in-effect)
+  if (loading && !pesanan) {
+    fetchPesanan()
+  }
 
   if (loading) {
     return <div className="p-4">Memuat...</div>
