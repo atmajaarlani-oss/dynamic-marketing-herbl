@@ -8,7 +8,6 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
 const BiteshipApiKey = process.env.BITESHIP_API_KEY!
 
-type HasilPesanan = { pesanan_id: string; nama_produk: string; harga_satuan: number; subtotal: number; total: number }
 
 function gagal(status: number, error: string) {
   return NextResponse.json({ success: false, error }, { status })
@@ -80,7 +79,7 @@ export async function POST(request: Request) {
     })
     if (biteshipRes.ok) {
       const biteshipData = await biteshipRes.json()
-      biteshipOrderId = (biteshipData as Record<string, unknown>).id ?? null
+      biteshipOrderId = String((biteshipData as Record<string, unknown>).id ?? null) as string | null
     }
   } catch (e) {
     console.error('Biteship order gagal (non-fatal):', e)
