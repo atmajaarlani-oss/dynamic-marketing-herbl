@@ -19,7 +19,22 @@ interface OrderStatus {
   created_at: string
 }
 
-function petakan(pesanan: any): OrderStatus {
+interface RawPesanan {
+  midtrans_order_id: string
+  nama_pembeli: string
+  nama_produk: string
+  jumlah: number
+  harga_satuan: number
+  ongkir: number
+  total_bayar: number
+  kurir: string
+  status: string
+  resi: string | null
+  tracking_link: string | null
+  created_at: string
+}
+
+function petakan(pesanan: RawPesanan): OrderStatus {
   return {
     order_id: pesanan.midtrans_order_id,
     nama_pembeli: pesanan.nama_pembeli,
