@@ -84,6 +84,11 @@
 | `expires_at` | `timestamptz` |  Nullable |
 | `biteship_order_id` | `varchar` |  Nullable |
 | `destination_area_id` | `varchar` |  Nullable |
+| `status_pengiriman` | `text` |  |
+| `pengiriman_error` | `text` |  Nullable |
+| `pengiriman_dicoba` | `int4` |  |
+| `pengiriman_mulai` | `timestamptz` |  Nullable |
+| `tracking_link` | `text` |  Nullable |
 
 ## Table `wilayah_provinsi`
 
