@@ -65,6 +65,9 @@ export default function StatusClient({ orderId }: { orderId: string }) {
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const purchaseTrackedRef = useRef(false)
+  const [pollExhausted, setPollExhausted] = useState(false)
+  const pollCountRef = useRef(0)
+  const pollModeRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!orderId || orderId.trim() === '') {
@@ -124,7 +127,29 @@ export default function StatusClient({ orderId }: { orderId: string }) {
     if (order.status === 'paid' && order.resi) return
     if (order.status === 'cancelled' || order.status === 'expired') return
 
+    const isPaidNoResi = order.status === 'paid' && !order.resi
+    const isPending = order.status === 'pending'
+    const mode = isPaidNoResi ? 'paid-no-resi' : isPending ? 'pending' : 'none'
+
+    if (pollModeRef.current !== mode) {
+      pollModeRef.current = mode
+      pollCountRef.current = 0
+      setPollExhausted(false)
+    }
+
+    if (mode === 'none') return
+
+    const intervalMs = isPaidNoResi ? 30000 : 5000
+    const maxPolls = isPaidNoResi ? 10 : 120
+
     const interval = setInterval(async () => {
+      pollCountRef.current += 1
+      if (pollCountRef.current > maxPolls) {
+        clearInterval(interval)
+        if (isPaidNoResi) setPollExhausted(true)
+        return
+      }
+
       try {
         const res = await fetch(`/api/pesanan/status?order_id=${encodeURIComponent(orderId)}`)
         if (res.ok) {
@@ -136,7 +161,7 @@ export default function StatusClient({ orderId }: { orderId: string }) {
       } catch {
         // silent - keep polling
       }
-    }, 5000)
+    }, intervalMs)
 
     return () => clearInterval(interval)
   }, [order, orderId])
@@ -147,6 +172,12 @@ export default function StatusClient({ orderId }: { orderId: string }) {
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
+
+  useEffect(() => {
+    pollCountRef.current = 0
+    pollModeRef.current = null
+    setPollExhausted(false)
+  }, [orderId])
 
   const waLink = () => {
     const msg = encodeURIComponent(
@@ -254,8 +285,14 @@ export default function StatusClient({ orderId }: { orderId: string }) {
               </div>
             ) : (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                Nomor resi sedang diproses, otomatis update...
+                {pollExhausted ? (
+                  <span>Resi belum tersedia. Hubungi kami lewat WhatsApp jika lebih dari 1x24 jam.</span>
+                ) : (
+                  <>
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    Nomor resi sedang diproses, otomatis update...
+                  </>
+                )}
               </div>
             )}
           </div>
