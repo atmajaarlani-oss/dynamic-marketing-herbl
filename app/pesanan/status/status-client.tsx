@@ -19,6 +19,23 @@ interface OrderStatus {
   created_at: string
 }
 
+function petakan(pesanan: any): OrderStatus {
+  return {
+    order_id: pesanan.midtrans_order_id,
+    nama_pembeli: pesanan.nama_pembeli,
+    nama_produk: pesanan.nama_produk,
+    jumlah: pesanan.jumlah,
+    harga_satuan: pesanan.harga_satuan,
+    ongkir: pesanan.ongkir,
+    total_bayar: pesanan.total_bayar,
+    kurir: pesanan.kurir,
+    status: pesanan.status,
+    resi: pesanan.resi,
+    tracking_link: pesanan.tracking_link,
+    created_at: pesanan.created_at,
+  }
+}
+
 function formatRupiah(value: number | string) {
   return new Intl.NumberFormat('id-ID', {
     style: 'currency',
@@ -45,7 +62,7 @@ export default function StatusClient({ orderId }: { orderId: string }) {
 
     let cancelled = false
 
-    fetch(`/api/pesanan/status?id=${orderId}`)
+    fetch(`/api/pesanan/status?order_id=${encodeURIComponent(orderId)}`)
       .then(async (res) => {
         if (cancelled) return
 
@@ -55,8 +72,13 @@ export default function StatusClient({ orderId }: { orderId: string }) {
           return
         }
 
-        const data: OrderStatus = await res.json()
-        setOrder(data)
+        const data = await res.json()
+        if (data.success === false) {
+          setError('Pesanan tidak ditemukan.')
+          setLoading(false)
+          return
+        }
+        setOrder(petakan(data.pesanan))
         setLoading(false)
       })
       .catch(() => {
@@ -89,10 +111,12 @@ export default function StatusClient({ orderId }: { orderId: string }) {
 
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`/api/pesanan/status?id=${orderId}`)
+        const res = await fetch(`/api/pesanan/status?order_id=${encodeURIComponent(orderId)}`)
         if (res.ok) {
-          const data: OrderStatus = await res.json()
-          setOrder(data)
+          const data = await res.json()
+          if (data.success !== false) {
+            setOrder(petakan(data.pesanan))
+          }
         }
       } catch {
         // silent - keep polling
