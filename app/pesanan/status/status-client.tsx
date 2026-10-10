@@ -19,6 +19,38 @@ interface OrderStatus {
   created_at: string
 }
 
+interface RawPesanan {
+  midtrans_order_id: string
+  nama_pembeli: string
+  nama_produk: string
+  jumlah: number
+  harga_satuan: number
+  ongkir: number
+  total_bayar: number
+  kurir: string
+  status: string
+  resi: string | null
+  tracking_link: string | null
+  created_at: string
+}
+
+function petakan(pesanan: RawPesanan): OrderStatus {
+  return {
+    order_id: pesanan.midtrans_order_id,
+    nama_pembeli: pesanan.nama_pembeli,
+    nama_produk: pesanan.nama_produk,
+    jumlah: pesanan.jumlah,
+    harga_satuan: pesanan.harga_satuan,
+    ongkir: pesanan.ongkir,
+    total_bayar: pesanan.total_bayar,
+    kurir: pesanan.kurir,
+    status: pesanan.status,
+    resi: pesanan.resi,
+    tracking_link: pesanan.tracking_link,
+    created_at: pesanan.created_at,
+  }
+}
+
 function formatRupiah(value: number | string) {
   return new Intl.NumberFormat('id-ID', {
     style: 'currency',
@@ -33,6 +65,9 @@ export default function StatusClient({ orderId }: { orderId: string }) {
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const purchaseTrackedRef = useRef(false)
+  const [pollExhausted, setPollExhausted] = useState(false)
+  const pollCountRef = useRef(0)
+  const pollModeRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!orderId || orderId.trim() === '') {
@@ -45,7 +80,7 @@ export default function StatusClient({ orderId }: { orderId: string }) {
 
     let cancelled = false
 
-    fetch(`/api/pesanan/status?id=${orderId}`)
+    fetch(`/api/pesanan/status?order_id=${encodeURIComponent(orderId)}`)
       .then(async (res) => {
         if (cancelled) return
 
@@ -55,8 +90,13 @@ export default function StatusClient({ orderId }: { orderId: string }) {
           return
         }
 
-        const data: OrderStatus = await res.json()
-        setOrder(data)
+        const data = await res.json()
+        if (data.success === false) {
+          setError('Pesanan tidak ditemukan.')
+          setLoading(false)
+          return
+        }
+        setOrder(petakan(data.pesanan))
         setLoading(false)
       })
       .catch(() => {
@@ -73,6 +113,8 @@ export default function StatusClient({ orderId }: { orderId: string }) {
   useEffect(() => {
     if (!order) return
 
+    pollModeRef.current = null
+
     if (order.status === 'paid' && !purchaseTrackedRef.current) {
       purchaseTrackedRef.current = true
       trackEvent('Purchase', {
@@ -87,17 +129,41 @@ export default function StatusClient({ orderId }: { orderId: string }) {
     if (order.status === 'paid' && order.resi) return
     if (order.status === 'cancelled' || order.status === 'expired') return
 
+    const isPaidNoResi = order.status === 'paid' && !order.resi
+    const isPending = order.status === 'pending'
+    const mode = isPaidNoResi ? 'paid-no-resi' : isPending ? 'pending' : 'none'
+
+    if (pollModeRef.current !== mode) {
+      pollModeRef.current = mode
+      pollCountRef.current = 0
+      setPollExhausted(false)
+    }
+
+    if (mode === 'none') return
+
+    const intervalMs = isPaidNoResi ? 30000 : 5000
+    const maxPolls = isPaidNoResi ? 10 : 120
+
     const interval = setInterval(async () => {
+      pollCountRef.current += 1
+      if (pollCountRef.current > maxPolls) {
+        clearInterval(interval)
+        if (isPaidNoResi) setPollExhausted(true)
+        return
+      }
+
       try {
-        const res = await fetch(`/api/pesanan/status?id=${orderId}`)
+        const res = await fetch(`/api/pesanan/status?order_id=${encodeURIComponent(orderId)}`)
         if (res.ok) {
-          const data: OrderStatus = await res.json()
-          setOrder(data)
+          const data = await res.json()
+          if (data.success !== false) {
+            setOrder(petakan(data.pesanan))
+          }
         }
       } catch {
         // silent - keep polling
       }
-    }, 5000)
+    }, intervalMs)
 
     return () => clearInterval(interval)
   }, [order, orderId])
@@ -215,8 +281,14 @@ export default function StatusClient({ orderId }: { orderId: string }) {
               </div>
             ) : (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                Nomor resi sedang diproses, otomatis update...
+                {pollExhausted ? (
+                  <span>Resi belum tersedia. Hubungi kami lewat WhatsApp jika lebih dari 1x24 jam.</span>
+                ) : (
+                  <>
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    Nomor resi sedang diproses, otomatis update...
+                  </>
+                )}
               </div>
             )}
           </div>

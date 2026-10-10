@@ -1,5 +1,10 @@
 /** Midtrans Snap lewat fetch biasa (tanpa paket midtrans-client, aman untuk Cloudflare). */
 
+function btoaPoly(s: string): string {
+  if (typeof btoa === 'function') return btoa(s)
+  return Buffer.from(s, 'binary').toString('base64')
+}
+
 export async function createSnapTransaction(payload: Record<string, unknown>): Promise<{ token: string; redirect_url: string }> {
   const serverKey = process.env.MIDTRANS_SERVER_KEY
   if (!serverKey) throw new Error('MIDTRANS_SERVER_KEY belum diset')
@@ -12,7 +17,7 @@ export async function createSnapTransaction(payload: Record<string, unknown>): P
     headers: {
       Accept: 'application/json',
       'Content-Type': 'application/json',
-      Authorization: 'Basic ' + btoa(serverKey + ':'),
+      Authorization: 'Basic ' + btoaPoly(serverKey + ':'),
     },
     body: JSON.stringify(payload),
     signal: AbortSignal.timeout(15000),
