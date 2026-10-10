@@ -113,6 +113,8 @@ export default function StatusClient({ orderId }: { orderId: string }) {
   useEffect(() => {
     if (!order) return
 
+    pollModeRef.current = null
+
     if (order.status === 'paid' && !purchaseTrackedRef.current) {
       purchaseTrackedRef.current = true
       trackEvent('Purchase', {
@@ -172,12 +174,6 @@ export default function StatusClient({ orderId }: { orderId: string }) {
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
-
-  useEffect(() => {
-    pollCountRef.current = 0
-    pollModeRef.current = null
-    setPollExhausted(false)
-  }, [orderId])
 
   const waLink = () => {
     const msg = encodeURIComponent(
