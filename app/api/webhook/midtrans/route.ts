@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { sha512Hex, samaAman } from '@/lib/midtrans'
+import { buatOrderBiteship } from '@/lib/biteship-order'
 
 function petakanStatus(trx: string, fraud: string): 'paid' | 'challenge' | 'cancelled' | 'expired' | null {
   switch (trx) {
@@ -47,5 +48,14 @@ export async function POST(request: Request) {
   }
   if (data === 'nominal_beda') console.error('Webhook: NOMINAL TIDAK COCOK untuk', order_id)
   if (data === 'tidak_ada') console.error('Webhook: pesanan tidak ditemukan', order_id)
+  if (status === 'paid' && data !== 'nominal_beda' && data !== 'tidak_ada') {
+    try {
+      const hasil = await buatOrderBiteship(String(order_id))
+      console.log('Webhook: pengiriman', String(order_id), hasil)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      console.error('Webhook: pengiriman error', msg)
+    }
+  }
   return NextResponse.json({ message: data }, { status: 200 })
 }
