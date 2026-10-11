@@ -16,6 +16,7 @@ interface OrderStatus {
   status: string
   resi: string | null
   tracking_link: string | null
+  status_pengiriman: string | null
   created_at: string
 }
 
@@ -31,6 +32,7 @@ interface RawPesanan {
   status: string
   resi: string | null
   tracking_link: string | null
+  status_pengiriman: string | null
   created_at: string
 }
 
@@ -47,6 +49,7 @@ function petakan(pesanan: RawPesanan): OrderStatus {
     status: pesanan.status,
     resi: pesanan.resi,
     tracking_link: pesanan.tracking_link,
+    status_pengiriman: pesanan.status_pengiriman ?? null,
     created_at: pesanan.created_at,
   }
 }
@@ -109,13 +112,9 @@ export default function StatusClient({ orderId }: { orderId: string }) {
     return () => { cancelled = true }
   }, [orderId, setError, setLoading])
 
-  // Polling for pending/paid without resi
+  // Purchase tracking effect
   useEffect(() => {
-    if (!order) return
-
-    pollModeRef.current = null
-
-    if (order.status === 'paid' && !purchaseTrackedRef.current) {
+    if (order?.status === 'paid' && !purchaseTrackedRef.current) {
       purchaseTrackedRef.current = true
       trackEvent('Purchase', {
         value: order.total_bayar,
@@ -125,12 +124,20 @@ export default function StatusClient({ orderId }: { orderId: string }) {
         num_items: order.jumlah,
       })
     }
+  }, [order?.status, order?.jumlah, order?.nama_produk, order?.total_bayar])
 
-    if (order.status === 'paid' && order.resi) return
-    if (order.status === 'cancelled' || order.status === 'expired') return
+  // Polling for pending/paid without resi
+  useEffect(() => {
+    const status = order?.status
+    const resi = order?.resi
+    const statusPengiriman = order?.status_pengiriman
 
-    const isPaidNoResi = order.status === 'paid' && !order.resi
-    const isPending = order.status === 'pending'
+    if (status === 'paid' && resi) return
+    if (status === 'cancelled' || status === 'expired') return
+    if (status === 'paid' && !resi && statusPengiriman === 'gagal') return
+
+    const isPaidNoResi = status === 'paid' && !resi && statusPengiriman !== 'gagal'
+    const isPending = status === 'pending'
     const mode = isPaidNoResi ? 'paid-no-resi' : isPending ? 'pending' : 'none'
 
     if (pollModeRef.current !== mode) {
@@ -166,7 +173,7 @@ export default function StatusClient({ orderId }: { orderId: string }) {
     }, intervalMs)
 
     return () => clearInterval(interval)
-  }, [order, orderId])
+  }, [order?.status, order?.resi, order?.status_pengiriman, orderId])
 
   const copyResi = () => {
     if (!order?.resi) return
@@ -281,7 +288,9 @@ export default function StatusClient({ orderId }: { orderId: string }) {
               </div>
             ) : (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                {pollExhausted ? (
+                {order.status_pengiriman === 'gagal' ? (
+                  <span>Resi sedang kami proses manual. Hubungi WhatsApp jika lebih dari 1x24 jam.</span>
+                ) : pollExhausted ? (
                   <span>Resi belum tersedia. Hubungi kami lewat WhatsApp jika lebih dari 1x24 jam.</span>
                 ) : (
                   <>
