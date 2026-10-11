@@ -16,6 +16,7 @@ interface OrderStatus {
   status: string
   resi: string | null
   tracking_link: string | null
+  status_pengiriman: string | null
   created_at: string
 }
 
@@ -31,6 +32,7 @@ interface RawPesanan {
   status: string
   resi: string | null
   tracking_link: string | null
+  status_pengiriman: string | null
   created_at: string
 }
 
@@ -47,6 +49,7 @@ function petakan(pesanan: RawPesanan): OrderStatus {
     status: pesanan.status,
     resi: pesanan.resi,
     tracking_link: pesanan.tracking_link,
+    status_pengiriman: pesanan.status_pengiriman ?? null,
     created_at: pesanan.created_at,
   }
 }
@@ -281,7 +284,9 @@ export default function StatusClient({ orderId }: { orderId: string }) {
               </div>
             ) : (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                {pollExhausted ? (
+                {order.status_pengiriman === 'gagal' ? (
+                  <span>Resi sedang kami proses manual. Hubungi WhatsApp jika lebih dari 1x24 jam.</span>
+                ) : pollExhausted ? (
                   <span>Resi belum tersedia. Hubungi kami lewat WhatsApp jika lebih dari 1x24 jam.</span>
                 ) : (
                   <>
