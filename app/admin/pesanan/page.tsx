@@ -2,19 +2,6 @@ import Link from "next/link"
 import { createClient } from "@/lib/supabase"
 import KirimUlangButton from "@/components/admin/KirimUlangButton"
 
-type Pesanan = {
-  midtrans_order_id: string
-  nama_pembeli: string
-  nama_produk: string
-  jumlah: number
-  total_bayar: number | null
-  status: string
-  status_pengiriman: string
-  resi: string | null
-  pengiriman_error: string | null
-  created_at: string
-}
-
 export default async function AdminPesananPage() {
   const supabase = await createClient()
   const { data, error } = await supabase
