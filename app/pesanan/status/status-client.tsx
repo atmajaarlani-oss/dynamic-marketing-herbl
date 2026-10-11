@@ -112,13 +112,9 @@ export default function StatusClient({ orderId }: { orderId: string }) {
     return () => { cancelled = true }
   }, [orderId, setError, setLoading])
 
-  // Polling for pending/paid without resi
+  // Purchase tracking effect
   useEffect(() => {
-    if (!order) return
-
-    pollModeRef.current = null
-
-    if (order.status === 'paid' && !purchaseTrackedRef.current) {
+    if (order?.status === 'paid' && !purchaseTrackedRef.current) {
       purchaseTrackedRef.current = true
       trackEvent('Purchase', {
         value: order.total_bayar,
@@ -128,12 +124,20 @@ export default function StatusClient({ orderId }: { orderId: string }) {
         num_items: order.jumlah,
       })
     }
+  }, [order?.status])
 
-    if (order.status === 'paid' && order.resi) return
-    if (order.status === 'cancelled' || order.status === 'expired') return
+  // Polling for pending/paid without resi
+  useEffect(() => {
+    const status = order?.status
+    const resi = order?.resi
+    const statusPengiriman = order?.status_pengiriman
 
-    const isPaidNoResi = order.status === 'paid' && !order.resi
-    const isPending = order.status === 'pending'
+    if (status === 'paid' && resi) return
+    if (status === 'cancelled' || status === 'expired') return
+    if (status === 'paid' && !resi && statusPengiriman === 'gagal') return
+
+    const isPaidNoResi = status === 'paid' && !resi && statusPengiriman !== 'gagal'
+    const isPending = status === 'pending'
     const mode = isPaidNoResi ? 'paid-no-resi' : isPending ? 'pending' : 'none'
 
     if (pollModeRef.current !== mode) {
@@ -169,7 +173,7 @@ export default function StatusClient({ orderId }: { orderId: string }) {
     }, intervalMs)
 
     return () => clearInterval(interval)
-  }, [order, orderId])
+  }, [order?.status, order?.resi, order?.status_pengiriman, orderId])
 
   const copyResi = () => {
     if (!order?.resi) return
