@@ -124,7 +124,7 @@ export default function StatusClient({ orderId }: { orderId: string }) {
         num_items: order.jumlah,
       })
     }
-  }, [order?.status])
+  }, [order?.status, order?.jumlah, order?.nama_produk, order?.total_bayar])
 
   // Polling for pending/paid without resi
   useEffect(() => {
