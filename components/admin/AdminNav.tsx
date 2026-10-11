@@ -9,6 +9,7 @@ const links = [
   { href: "/admin", label: "Beranda" },
   { href: "/admin/produk", label: "Produk" },
   { href: "/admin/produk/tambah", label: "Tambah produk" },
+  { href: "/admin/pesanan", label: "Pesanan" },
 ]
 
 export default function AdminNav({ email }: { email: string | null }) {
