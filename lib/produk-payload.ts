@@ -34,8 +34,9 @@ export function pilihFieldProduk(
   const allowedBool = new Set(["is_active"])
 
   const result: Record<string, string | number | boolean | null> = {}
+  const obj = body as Record<string, unknown>
 
-  for (const [key, value] of Object.entries(body)) {
+  for (const [key, value] of Object.entries(obj)) {
     if (allowedText.has(key)) {
       if (value === null || typeof value === "string") {
         result[key] = value as string | null
