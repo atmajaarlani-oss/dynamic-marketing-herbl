@@ -24,6 +24,8 @@ type BiteshipOrderResponse = {
   }
 }
 
+const DIMENSI_DEFAULT_CM = { length: 15, width: 10, height: 10 } as const
+
 export async function buatOrderBiteship(
   midtransOrderId: string
 ): Promise<'dibuat' | 'gagal' | 'dilewati'> {
@@ -106,6 +108,9 @@ export async function buatOrderBiteship(
         value: Math.round(Number(harga_satuan)),
         quantity: Math.round(Number(jumlah)),
         weight: Math.round(Number(berat_gram)),
+        length: DIMENSI_DEFAULT_CM.length,
+        width: DIMENSI_DEFAULT_CM.width,
+        height: DIMENSI_DEFAULT_CM.height,
       },
     ],
   }

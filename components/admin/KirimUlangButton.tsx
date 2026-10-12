@@ -10,6 +10,7 @@ type KirimUlangButtonProps = {
 type ApiResponse = {
   success?: boolean
   error?: string
+  hasil?: 'dibuat' | 'gagal' | 'dilewati'
 }
 
 export default function KirimUlangButton({ orderId }: KirimUlangButtonProps) {
@@ -21,14 +22,26 @@ export default function KirimUlangButton({ orderId }: KirimUlangButtonProps) {
     if (!confirm("Buat ulang pengiriman untuk " + orderId + "?")) return
     setLoading(true)
     setMsg("")
-    const res = await fetch("/api/admin/pesanan/" + encodeURIComponent(orderId) + "/kirim", { method: "POST" })
-    const data: ApiResponse = await res.json()
+    let data: ApiResponse
+    try {
+      const res = await fetch("/api/admin/pesanan/" + encodeURIComponent(orderId) + "/kirim", { method: "POST" })
+      data = await res.json()
+    } catch {
+      setMsg("Gagal: respons tidak valid")
+      setLoading(false)
+      return
+    }
     setLoading(false)
-    if (res.ok && data.success) {
+    if (data.hasil === 'dibuat') {
       router.refresh()
       setMsg("Berhasil")
+    } else if (data.hasil === 'gagal') {
+      router.refresh()
+      setMsg("Gagal: lihat pesan error di kolom Pengiriman")
+    } else if (data.hasil === 'dilewati') {
+      setMsg("Sedang diproses atau tidak memenuhi syarat")
     } else {
-      setMsg("Gagal: " + (data.error || "Error"))
+      setMsg("Gagal: " + (data.error ?? "tidak diketahui"))
     }
   }
 
