@@ -2,10 +2,6 @@ import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
 export async function proxy(request: NextRequest) {
-  if (request.nextUrl.pathname === "/admin/login") {
-    return NextResponse.next()
-  }
-
   if (request.nextUrl.pathname.startsWith('/api/')) {
     return NextResponse.next()
   }
@@ -31,7 +27,7 @@ export async function proxy(request: NextRequest) {
 
   if (!user || !isAdmin) {
     const loginUrl = request.nextUrl.clone()
-    loginUrl.pathname = "/admin/login"
+    loginUrl.pathname = "/admin-login"
     loginUrl.searchParams.set("next", request.nextUrl.pathname)
     return NextResponse.redirect(loginUrl)
   }

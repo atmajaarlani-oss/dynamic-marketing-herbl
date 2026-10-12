@@ -10,18 +10,22 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   const supabase = await createClient()
 
   let user = null
-  let isAdmin = false
+  let failed = false
   try {
     const { data: { user: u } } = await supabase.auth.getUser()
     user = u
-    isAdmin = user?.app_metadata?.role === "admin" || user?.app_metadata?.is_admin === true
-
-    if (!user || !isAdmin) {
-      await supabase.auth.signOut()
-      redirect("/admin-login?error=not_admin")
-    }
   } catch {
+    failed = true
+  }
+
+  if (failed) {
     redirect("/admin-login")
+  }
+
+  const isAdmin = user?.app_metadata?.role === "admin" || user?.app_metadata?.is_admin === true
+  if (!user || !isAdmin) {
+    await supabase.auth.signOut()
+    redirect("/admin-login?error=not_admin")
   }
 
   return (

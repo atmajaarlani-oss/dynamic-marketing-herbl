@@ -156,51 +156,6 @@
 | `label` | `text` |  |
 | `teks_cari` | `text` |  |
 
-## Table `biteship_areas`
-
-### Columns
-
-| Name | Type | Constraints |
-|------|------|-------------|
-| `id` | `int4` | Primary |
-| `biteship_id` | `int8` |  Nullable Unique |
-| `wilayah_desa_id` | `text` |  Nullable |
-| `name` | `varchar` |  Nullable |
-| `type` | `varchar` |  Nullable |
-| `postal_code` | `varchar` |  Nullable |
-| `synced_at` | `timestamp` |  Nullable |
-
-## Table `ongkir_cache`
-
-### Columns
-
-| Name | Type | Constraints |
-|------|------|-------------|
-| `id` | `int4` | Primary |
-| `destination_area_id` | `varchar` |  Nullable |
-| `courier_id` | `varchar` |  Nullable |
-| `courier_name` | `varchar` |  Nullable |
-| `cost` | `numeric` |  Nullable |
-| `estimated_days` | `int4` |  Nullable |
-| `cached_at` | `timestamp` |  Nullable |
-| `expires_at` | `timestamp` |  Nullable |
-
-## Table `wilayah_biteship_mapping`
-
-### Columns
-
-| Name | Type | Constraints |
-|------|------|-------------|
-| `local_desa_id` | `text` | Primary |
-| `biteship_order_id` | `text` |  Nullable |
-| `desa` | `text` |  Nullable |
-| `kecamatan` | `text` |  Nullable |
-| `kabkota` | `text` |  Nullable |
-| `provinsi` | `text` |  Nullable |
-| `kode_pos` | `text` |  Nullable |
-| `label` | `text` |  Nullable |
-| `last_used_at` | `timestamptz` |  Nullable |
-
 ## RLS Policies
 
 ### `global_settings`
