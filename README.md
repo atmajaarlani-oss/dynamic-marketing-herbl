@@ -51,18 +51,20 @@ app/
 ├── page.tsx                         Landing page utama
 ├── home/page.tsx                    Halaman home/katalog
 ├── produk/[slug]/page.tsx           Detail produk publik
-├── pesanan/[orderId]/page.tsx       Entry route detail pesanan
 ├── pesanan/status/                  Status dan polling pesanan
 ├── pesanan/resume/                  Melanjutkan pembayaran Midtrans
-├── admin/                           Panel admin produk
+├── wilayah/cari/                    Pencarian wilayah dari database
+├── admin/                           Panel admin produk dan pesanan
+├── admin/pesanan/                   Daftar dan pengelolaan pesanan admin
 └── api/
     ├── checkout/                    Membuat pesanan dan Snap token
     ├── pesanan/status/              Membaca status pesanan
     ├── pesanan/resume/              Mengambil Snap token tersimpan
     ├── webhook/midtrans/            Menerima notifikasi pembayaran
-    ├── area-search/                 Mencari area Biteship
+    ├── wilayah/cari/                Mencari wilayah dari database
     ├── ongkir/                      Mengambil pilihan ongkir
-    └── admin/produk/                CRUD produk admin
+    ├── admin/produk/                CRUD produk admin
+    └── admin/pesanan/[orderId]/kirim/ Mengirim ulang pengiriman Biteship
 
 components/landing/                  Section marketing dan form transaksi
 components/admin/                    Navigasi, form, dan daftar produk admin
@@ -70,7 +72,8 @@ lib/supabase.ts                      Supabase server/admin helper
 lib/supabase-browser.ts              Supabase browser helper
 lib/produk-view-model.ts             Normalisasi data produk untuk UI
 lib/harga.ts                         Format dan perhitungan harga
-middleware.ts                        Proteksi route admin
+lib/quote.ts                         Quote ongkir bertanda tangan HMAC
+proxy.ts                             Proteksi route admin
 ```
 
 ## Alur pelanggan
@@ -107,7 +110,7 @@ middleware.ts                        Proteksi route admin
 
 `GET /api/pesanan/resume?order_id=...` membaca pesanan berdasarkan `midtrans_order_id` dan mengembalikan token yang tersimpan. Token lama harus menjadi jalur utama; endpoint tidak boleh membuat transaksi kedua jika token masih tersedia.
 
-Jika token kosong, endpoint dapat menggunakan fallback server Midtrans sesuai implementasi saat ini. Untuk pesanan baru, keberadaan token seharusnya diperiksa di database sebelum menguji alur tutup-popup/resume.
+Jika token kosong, endpoint mengembalikan kegagalan resume. Untuk pesanan baru, keberadaan token seharusnya diperiksa di database sebelum menguji alur tutup-popup/resume.
 
 ### Webhook
 
@@ -143,9 +146,11 @@ SUPABASE_SERVICE_ROLE_KEY=
 ```env
 MIDTRANS_SERVER_KEY=
 NEXT_PUBLIC_MIDTRANS_CLIENT_KEY=
+MIDTRANS_IS_PRODUCTION=false
+NEXT_PUBLIC_MIDTRANS_SNAP_URL=
 ```
 
-Mode saat ini menggunakan endpoint Snap sandbox. Sebelum production, ganti key dan URL Snap ke pasangan production secara bersamaan.
+URL Snap dipilih berdasarkan `MIDTRANS_IS_PRODUCTION` dan `NEXT_PUBLIC_MIDTRANS_SNAP_URL`. Gunakan URL sandbox untuk mode development dan URL production untuk transaksi live, bersama pasangan key yang sesuai.
 
 ### Biteship
 
@@ -153,13 +158,19 @@ Mode saat ini menggunakan endpoint Snap sandbox. Sebelum production, ganti key d
 BITESHIP_API_KEY=
 BITESHIP_ORIGIN_CONTACT_NAME=
 BITESHIP_ORIGIN_CONTACT_PHONE=
-BITESHIP_ORIGIN_AREA_ID=
+BITESHIP_ORIGIN_POSTAL_CODE=
 BITESHIP_ORIGIN_ADDRESS=
-BITESHIP_ORIGIN_LATITUDE=
-BITESHIP_ORIGIN_LONGITUDE=
 ```
 
-Pastikan koordinat, area ID, alamat asal, dan API key berasal dari lingkungan yang sama (test atau production).
+Pastikan kode pos, alamat asal, dan API key berasal dari lingkungan yang sama (test atau production).
+
+### Quote ongkir
+
+```env
+QUOTE_SIGNING_SECRET=
+```
+
+`QUOTE_SIGNING_SECRET` wajib memiliki minimal 32 karakter. Secret ini digunakan untuk menandatangani quote ongkir agar nilai yang dikirim kembali oleh browser tidak dapat dimanipulasi.
 
 ### Meta Pixel opsional
 
@@ -199,9 +210,10 @@ Script yang tersedia:
 | `GET` | `/api/pesanan/status?order_id=...` | Membaca status/detail pesanan |
 | `GET` | `/api/pesanan/resume?order_id=...` | Mengambil Snap token untuk pembayaran ulang |
 | `POST` | `/api/webhook/midtrans` | Menerima notifikasi status Midtrans |
-| `GET` | `/api/area-search?...` | Proxy pencarian area Biteship |
+| `GET` | `/api/wilayah/cari?...` | Mencari wilayah dari database |
 | `POST` | `/api/ongkir` | Mengambil pilihan ongkir |
 | `GET/POST/...` | `/api/admin/produk` | Operasi produk admin |
+| `POST` | `/api/admin/pesanan/[orderId]/kirim` | Mengirim ulang pengiriman Biteship |
 
 ## Supabase dan keamanan
 
@@ -230,21 +242,21 @@ Checklist penting sebelum production:
 
 ## Troubleshooting
 
-### Halaman pesanan 404
+### Membuka status pesanan
 
 Gunakan format route:
 
 ```text
-/pesanan/<midtrans_order_id>
+/pesanan/status?id=<midtrans_order_id>
 ```
 
 Contoh:
 
 ```text
-/pesanan/ORD-1234567890-ABCD
+/pesanan/status?id=ORD-1234567890-ABCD
 ```
 
-Pastikan order ID benar-benar ada di tabel `pesanan` dan jangan menghapus bagian `/pesanan/` dari URL.
+Pastikan order ID benar-benar ada di tabel `pesanan` dan parameter `id` terisi dengan benar.
 
 ### Resume menampilkan “Gagal mengambil token”
 
