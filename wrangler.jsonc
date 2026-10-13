@@ -13,5 +13,6 @@
       "binding": "WORKER_SELF_REFERENCE",
       "service": "dynamic-marketing-herbl"
     }
-  ]
+  ],
+  "observability": { "enabled": true }
 }
