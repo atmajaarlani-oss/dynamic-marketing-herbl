@@ -1,10 +1,5 @@
-import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { createPublicClient } from '@/lib/supabase-public'
 
 export async function GET(request: NextRequest) {
   const q = (new URL(request.url).searchParams.get('q') ?? '').trim().slice(0, 80)
@@ -14,6 +9,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const supabase = createPublicClient()
     // Cari dari wilayah_cari menggunakan teks_cari (sudah dioptimalkan)
     const { data, error } = await supabase
       .from('wilayah_cari')
